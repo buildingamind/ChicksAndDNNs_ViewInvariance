@@ -97,13 +97,13 @@ class ImageFolderDataModule(VisionDataModule):
             # if using the entire dataset
             if self.dataset_size == -1:
                 # Split
-                print("[INFO] Using entire dataset for training the model")
+                print("[INFO] Using the entire dataset for training the model")
                 self.dataset_train = self._split_dataset(dataset_train)
                 self.dataset_val = self._split_dataset(dataset_val, train=False)
                 
             # using a subset of the dataset
             else:
-                print("[INFO] Not using the dataset for training the model")
+                print("[INFO] Not using the entire dataset for training the model")
                 # last_index takes care of the val_split difference
                 last_index = int(self.dataset_size - (self.dataset_size * self.val_split))
                 

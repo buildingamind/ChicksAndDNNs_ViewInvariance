@@ -13,6 +13,7 @@ from pl_bolts.models.self_supervised.simclr import (
         SimCLRTrainDataTransform
         )
 from datamodules import ImageFolderDataModule
+from models.archs import resnets
 
 from models.archs.resnet_3b import resnet_3blocks
 from models.archs.resnet_2b import resnet_2blocks
@@ -78,7 +79,7 @@ def linear_warmup_decay(warmup_steps):
 class BarlowTwins(pl.LightningModule):
     def __init__(
         self,
-        num_training_samples=0, # FIXME
+        num_training_samples=0,
         batch_size=512,
         backbone='resnet18',
         encoder_out_dim=512,
@@ -109,6 +110,8 @@ class BarlowTwins(pl.LightningModule):
             if self.arch == 'resnet34' or self.arch == 'resnet18':
                 resnet = getattr(resnets, self.arch)
                 print("[INFO] Resnet Backbone Selected :: ", self.arch)
+                encoder = resnet(first_conv=True, maxpool1=True, pretrained=False, return_all_feature_maps=False)
+                return encoder
             # Resnet18 - 3blocks
             elif self.arch == 'resnet18_3blocks':
                 resnet = resnet_3blocks(pretrained=False)
@@ -121,10 +124,6 @@ class BarlowTwins(pl.LightningModule):
             elif self.arch == 'resnet18_1block':
                 resnet = resnet_1block(pretrained=False)
                 print("[INFO] Resnet Backbone Selected :: ", self.arch)
-
-            # FIXME: these layers should be set to true
-            # FIXME: make sure by printing the architectures above, that they are correctly assigned.
-            #encoder = resnet(first_conv=True, maxpool1=True, return_all_feature_maps=False)
 
         else:
             NotImplementedError("Encoder not implemented.")
@@ -269,7 +268,6 @@ def cli_main():
             input_height=dm.size()[-1],
         )
     
-    #FIXME: print training samples
     pl.seed_everything(args.seed_val)
     model = BarlowTwins(
     num_training_samples=args.dataset_size,

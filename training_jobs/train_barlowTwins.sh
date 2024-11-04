@@ -7,7 +7,7 @@ do
         --batch_size 512 \
         --data_dir /data/lpandey/UT_Austin_EgocentricDataset/output_64x64Squished/${viewpoint} \
         --seed_val 40 \
-        --dataset_size 10000 \
+        --dataset_size 80000 \
 	--backbone resnet18_2blocks \
         --shuffle \
         --val_split 0.013 \
