@@ -1,3 +1,5 @@
+
+# IMPORTS
 import os
 from argparse import ArgumentParser
 
@@ -17,13 +19,11 @@ from models.archs.ae_component_1b import resnet18_encoder_1b, resnet18_decoder_1
 
 
 from pytorch_lightning.callbacks import ModelCheckpoint
-#from pytorch_lightning.loggers import TensorBoardLogger
 from torch import nn as nn
 from torch.nn import functional as F
 
 from datamodules import ImageFolderDataModule
-#from models.ae_component import (resnet9_encoder, resnet9_decoder)
-from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
+from pytorch_lightning.loggers import TensorBoardLogger
 
 
 
@@ -53,7 +53,7 @@ class VAE(pl.LightningModule):
     def __init__(
         self,
         input_height: int,
-        enc_type: str = 'resnet18', # changed from resnet18 to resnet9
+        enc_type: str = 'resnet18',
         first_conv: bool = False,
         maxpool1: bool = False,
         enc_out_dim: int = 512,
@@ -99,22 +99,22 @@ class VAE(pl.LightningModule):
                 'enc': resnet34_encoder,
                 'dec': resnet34_decoder,
             },
-            'resnet18_3b': {                    # resnet18_3blocks
+            'resnet18_3b': {                    # resnet18_3blocks (custom)
                 'enc': resnet18_encoder_3b,
                 'dec': resnet18_decoder_3b,
             },
-            'resnet18_2b': {                    # resnet18_2blocks
+            'resnet18_2b': {                    # resnet18_2blocks (custom)
                 'enc': resnet18_encoder_2b,
                 'dec': resnet18_decoder_2b,
             },
-            'resnet18_1b': {                    # resnet18_1block
+            'resnet18_1b': {                    # resnet18_1block (custom)
                 'enc': resnet18_encoder_1b,
                 'dec': resnet18_decoder_1b,
             },
         }
 
         if enc_type not in valid_encoders:
-            self.encoder = resnet18_encoder(first_conv, maxpool1) # changed from resnet18 to resnet9
+            self.encoder = resnet18_encoder(first_conv, maxpool1)
             self.decoder = resnet18_decoder(self.latent_dim, self.input_height, first_conv, maxpool1)
         else:
             self.encoder = valid_encoders[enc_type]['enc'](first_conv, maxpool1)
@@ -123,7 +123,7 @@ class VAE(pl.LightningModule):
         self.fc_mu = nn.Linear(self.enc_out_dim, self.latent_dim)
         self.fc_var = nn.Linear(self.enc_out_dim, self.latent_dim)
 
-        print("Architecture selected: ", enc_type)
+        print("[INFO] Resnet Backbone Selected :: ", enc_type)
 
     @staticmethod
     def pretrained_weights_available():
@@ -195,7 +195,7 @@ class VAE(pl.LightningModule):
     def add_model_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
 
-        parser.add_argument("--enc_type", type=str, default='resnet18', help="resnet18/resnet50") # changed from resnet18 to resnet9
+        parser.add_argument("--enc_type", type=str, default='resnet18', choices=['resnet50', 'resnet34', 'resnet18', 'resnet18_3b', 'resnet18_2b', 'resnet18_1b'])
         parser.add_argument("--first_conv", action='store_false')
         parser.add_argument("--maxpool1", action='store_false')
         parser.add_argument("--lr", type=float, default=1e-4)
@@ -238,20 +238,25 @@ def cli_main(args=None):
     )
     parser.add_argument(
         "--dataset_size",
+        default=-1,
         type=int,
-        default=0,
-        help="Subset of dataset"
-    )
-    parser.add_argument(
-        "--project_name",
-        type=str,
-        help="wandb dashboard project name"
+        help="number of training samples. -1 (default)=entire dataset"
     )
     parser.add_argument(
         "--seed_val",
         type=int,
         default=0,
         help="SEED VALUE"
+    )
+    parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="shuffle training samples"
+    )
+    parser.add_argument(
+        "--print_model",
+        action="store_true",
+        help="display backbone"
     )
 
     parser = VAE.add_model_specific_args(parser)
@@ -261,8 +266,8 @@ def cli_main(args=None):
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        shuffle=True,
-        drop_last=False, # changed from True to False becz of empty dataloader error
+        shuffle=args.shuffle,
+        drop_last=False,
         val_split=args.val_split,
         dataset_size=args.dataset_size,
     )
@@ -285,8 +290,12 @@ def cli_main(args=None):
         sync_batchnorm=False,
         callbacks=callbacks,
     )
-    #print(model)
-    trainer.fit(model, datamodule=dm)
+    
+    if args.print_model:
+        print(model)
+    
+    # train model
+    trainer.fit(model, datamodule=dm) 
     
 
 if __name__ == "__main__":

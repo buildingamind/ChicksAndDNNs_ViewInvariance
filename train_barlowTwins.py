@@ -1,29 +1,23 @@
-from argparse import ArgumentParser
-from copy import deepcopy
-from typing import Any
-from functools import partial
 
+# IMPORTS
+from argparse import ArgumentParser
+from functools import partial
 import pytorch_lightning as pl
 import torch
-
-from pl_bolts.callbacks.byol_updates import BYOLMAWeightUpdate
-from pl_bolts.optimizers.lars_scheduling import LARSWrapper
-from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
-#from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
-#from pytorch_lightning.loggers import TensorBoardLogger
 from torch import nn
 from torch.nn import functional as F
-from torch.optim import Adam
-from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
+from pytorch_lightning.loggers import TensorBoardLogger
+from pl_bolts.models.self_supervised.simclr import (
+        SimCLREvalDataTransform, 
+        SimCLRTrainDataTransform
+        )
 from datamodules import ImageFolderDataModule
-from models.archs import resnets
-from models.archs import resnet_3b
-from models.archs import resnet_2b
-from models.archs import resnet_1b
+
 from models.archs.resnet_3b import resnet_3blocks
 from models.archs.resnet_2b import resnet_2blocks
 from models.archs.resnet_1b import resnet_1block
+
 
 
 
@@ -36,7 +30,7 @@ class BarlowTwinsLoss(nn.Module):
         self.lambda_coeff = lambda_coeff
 
     def off_diagonal_ele(self, x):
-        # taken from: https://github.com/facebookresearch/barlowtwins/blob/main/main.py
+        # adapted from: https://github.com/facebookresearch/barlowtwins/blob/main/main.py
         # return a flattened view of the off-diagonal elements of a square matrix
         n, m = x.shape
         assert n == m
@@ -55,7 +49,7 @@ class BarlowTwinsLoss(nn.Module):
         return on_diag + self.lambda_coeff * off_diag
         
 
-# dimensions are reduced, however paper shows they are 8192 for each layer.
+# using lower dimensions here instead of 8192 (as shown in the paper)
 class ProjectionHead(nn.Module):
     def __init__(self, input_dim=2048, hidden_dim=2048, output_dim=128):
         super().__init__()
@@ -84,9 +78,9 @@ def linear_warmup_decay(warmup_steps):
 class BarlowTwins(pl.LightningModule):
     def __init__(
         self,
-        num_training_samples=0, # TODO
+        num_training_samples=0, # FIXME
         batch_size=512,
-        architecture='resnet_2blocks',
+        backbone='resnet18',
         encoder_out_dim=512,
         lambda_coeff=5e-3,
         z_dim=128,
@@ -96,8 +90,7 @@ class BarlowTwins(pl.LightningModule):
     ):
         super().__init__()
 
-        self.arch = architecture
-        print("self.arch - ",self.arch)
+        self.arch = backbone
         self.encoder = self.init_encoder()
         self.projection_head = ProjectionHead(input_dim=encoder_out_dim, hidden_dim=encoder_out_dim, output_dim=z_dim)
         self.loss_fn = BarlowTwinsLoss(batch_size=batch_size, lambda_coeff=lambda_coeff, z_dim=z_dim)
@@ -109,43 +102,34 @@ class BarlowTwins(pl.LightningModule):
         self.num_training_samples = num_training_samples
         self.train_iters_per_epoch = self.num_training_samples // batch_size
 
-        #print("num of sampless - ", self.num_training_samples)
-
-
-    # def init_encoder(self,encoder):
-
-    #     if encoder is None:
-    #         resnet = getattr(resnets, "resnet18")
-    #         encoder = resnet(return_all_feature_maps=False)
-    #         # Encoder
-    #         self.encoder = encoder
-    #     else:
-    #         NotImplementedError("Encoder not implemented.")
-
 
     def init_encoder(self):
         if self.arch.startswith('resnet'):
             # Resnet34, Resnet18
             if self.arch == 'resnet34' or self.arch == 'resnet18':
                 resnet = getattr(resnets, self.arch)
-                print("Architecture selected - ", self.arch)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch)
             # Resnet18 - 3blocks
-            elif self.arch == 'resnet_3blocks':
-                resnet = getattr(resnet_3b, self.arch)
-                print("Architecture selected - Resnet18_3Blocks")
+            elif self.arch == 'resnet18_3blocks':
+                resnet = resnet_3blocks(pretrained=False)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch) 
             # Resnet18 - 2blocks
-            elif self.arch == 'resnet_2blocks':
-                resnet = getattr(resnet_2b, self.arch)
-                print("Architecture selected - Resnet18_2Blocks")
+            elif self.arch == 'resnet18_2blocks':
+                resnet = resnet_2blocks(pretrained=False)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch)
             # Resnet18 - 1block
-            elif self.arch == 'resnet_1block':
-                resnet = getattr(resnet_1b, self.arch)
-                print("Architecture selected - Resnet18_1Block")
-            encoder = resnet(first_conv=True, maxpool1=True, return_all_feature_maps=False)
+            elif self.arch == 'resnet18_1block':
+                resnet = resnet_1block(pretrained=False)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch)
+
+            # FIXME: these layers should be set to true
+            # FIXME: make sure by printing the architectures above, that they are correctly assigned.
+            #encoder = resnet(first_conv=True, maxpool1=True, return_all_feature_maps=False)
+
         else:
             NotImplementedError("Encoder not implemented.")
 
-        return encoder
+        return resnet
         
     def forward(self, x):
         return self.encoder(x)
@@ -189,28 +173,14 @@ class BarlowTwins(pl.LightningModule):
     @staticmethod
     def add_model_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
-
-
-    #     parser.add_argument(
-    #     "--architecture",
-    #     type=str,
-    #     choices=['resnet34','resnet18','resnet_3blocks','resnet_2blocks','resnet_1block'],
-    #     help="select architecture"
-    # )
-        # transform params
-        #parser.add_argument("--gaussian_blur", action="store_true", help="add gaussian blur")
-        #parser.add_argument("--jitter_strength", type=float, default=0.5, help="jitter strength")
-
         # Data
         parser.add_argument("--data_dir", type=str, default=".", help="directory containing dataset")
         parser.add_argument('--num_workers', default=8, type=int)
-
         # optim
         parser.add_argument('--batch_size', type=int, default=512)
         parser.add_argument('--learning_rate', type=float, default=1e-3)
         parser.add_argument('--weight_decay', type=float, default=1.5e-6)
         parser.add_argument('--warmup_epochs', type=float, default=10)
-
         # Model
         parser.add_argument('--meta_dir', default='.', type=str, help='path to meta.bin for imagenet')
 
@@ -218,10 +188,6 @@ class BarlowTwins(pl.LightningModule):
 
 
 def cli_main():
-    from pl_bolts.models.self_supervised.simclr import (
-        SimCLREvalDataTransform, SimCLRTrainDataTransform)
-
-    #seed_everything(1234)
 
     parser = ArgumentParser()
     parser.add_argument(
@@ -243,13 +209,9 @@ def cli_main():
     )
     parser.add_argument(
         "--dataset_size",
+        default=-1,
         type=int,
-        help="Subset of dataset"
-    )
-    parser.add_argument(
-        "--project_name",
-        type=str,
-        help="wandb dashboard project name"
+        help="number of training samples. -1 (default)=entire dataset"
     )
     parser.add_argument(
         "--seed_val",
@@ -258,10 +220,26 @@ def cli_main():
         help="SEED VALUE"
     )
     parser.add_argument(
-        "--architecture",
+        "--backbone",
         type=str,
-        choices=['resnet34','resnet18','resnet_3blocks','resnet_2blocks','resnet_1block'],
-        help="select architecture"
+        choices=['resnet34','resnet18','resnet18_3blocks','resnet18_2blocks','resnet18_1block'],
+        help="select backbone"
+    )
+    parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="shuffle training samples"
+    )
+    parser.add_argument(
+        "--print_model",
+        action="store_true",
+        help="display backbone"
+    )
+    parser.add_argument(
+        "--aug",
+        type=bool,
+        default=True,
+        help="apply augmentations to training samples"
     )
 
 
@@ -276,36 +254,33 @@ def cli_main():
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        shuffle=True,
-        drop_last=False, # changed from True to False
+        shuffle=args.shuffle,
+        drop_last=False,
         val_split=args.val_split,
-        dataset_size=args.dataset_size
+        dataset_size=args.dataset_size,
     )
 
-    dm.train_transforms = SimCLRTrainDataTransform(
-        input_height=dm.size()[-1],
-        #gaussian_blur=args.gaussian_blur,
-        #jitter_strength=args.jitter_strength,
-    )
+    if args.aug is True:
+        dm.train_transforms = SimCLRTrainDataTransform(
+            input_height=dm.size()[-1],
+        )
 
-    dm.val_transforms = SimCLREvalDataTransform(
-        input_height=dm.size()[-1],
-        #gaussian_blur=args.gaussian_blur,
-        #jitter_strength=args.jitter_strength,
-    )
+        dm.val_transforms = SimCLREvalDataTransform(
+            input_height=dm.size()[-1],
+        )
     
-
+    #FIXME: print training samples
     pl.seed_everything(args.seed_val)
     model = BarlowTwins(
     num_training_samples=args.dataset_size,
     batch_size=args.batch_size,
-    architecture=args.architecture,
+    backbone=args.backbone,
     )
 
     model_checkpoint = ModelCheckpoint(save_last=True, save_top_k=1, monitor='val_loss')
     callbacks = [model_checkpoint]
 
-    logger = TensorBoardLogger("/data/lpandey/LOGS/BarlowTwins", name=f"{args.exp_name}")
+    logger = TensorBoardLogger("/data/lpandey/LOGS/barlowTwins", name=f"{args.exp_name}")
    
     
     trainer = pl.Trainer(
@@ -315,8 +290,12 @@ def cli_main():
         sync_batchnorm=True if args.gpus > 1 else False,
         callbacks=callbacks,
     )
-    #print(model)
-    trainer.fit(model, datamodule=dm)
-
+    
+    if args.print_model:
+        print(model)
+    
+    # train model
+    trainer.fit(model, datamodule=dm) 
+    
 if __name__ == '__main__':
     cli_main()
