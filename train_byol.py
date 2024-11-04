@@ -1,27 +1,25 @@
+# IMPORTS
 from argparse import ArgumentParser
 from copy import deepcopy
 from typing import Any
-
 import pytorch_lightning as pl
 import torch
-
 from pl_bolts.callbacks.byol_updates import BYOLMAWeightUpdate
 from pl_bolts.optimizers.lars_scheduling import LARSWrapper
 from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
-#from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch import nn
+from pl_bolts.models.self_supervised.simclr import (
+        SimCLREvalDataTransform, 
+        SimCLRTrainDataTransform
+        )
 from torch.nn import functional as F
 from torch.optim import Adam
-from datamodules import ImageFolderDataModule, ImagePairsDataModule
+from datamodules import ImageFolderDataModule
+from pytorch_lightning.loggers import TensorBoardLogger
 from models.archs import resnets
-#from  models.archs import resnet_1block
-from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
-from models.archs import resnets
-from models.archs import resnet_3b
-from models.archs import resnet_2b
-from models.archs import resnet_1b
+
 from models.archs.resnet_3b import resnet_3blocks
 from models.archs.resnet_2b import resnet_2blocks
 from models.archs.resnet_1b import resnet_1block
@@ -48,9 +46,11 @@ class MLP(nn.Module):
 
 class SiameseArm(nn.Module):
 
-    def __init__(self):
+    def __init__(self,
+                 backbone
+                 ):
         super().__init__()
-        
+        self.arch = backbone
         # Encoder
         self.encoder = self.init_encoder()
         # Projector
@@ -65,28 +65,30 @@ class SiameseArm(nn.Module):
         return y, z, h
 
     def init_encoder(self):
-        if arch.startswith('resnet'):
+        if self.arch.startswith('resnet'):
             # Resnet34, Resnet18
-            if arch == 'resnet34' or arch == 'resnet18':
-                resnet = getattr(resnets, arch)
-                print("Architecture selected - ", arch)
+            if self.arch == 'resnet34' or self.arch == 'resnet18':
+                resnet = getattr(resnets, self.arch)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch)
+                encoder = resnet(first_conv=True, maxpool1=True, pretrained=False, return_all_feature_maps=False)
+                return encoder
             # Resnet18 - 3blocks
-            elif arch == 'resnet_3blocks':
-                resnet = getattr(resnet_3b, arch)
-                print("Architecture selected - Resnet18_3Blocks")
+            elif self.arch == 'resnet18_3blocks':
+                resnet = resnet_3blocks(pretrained=False)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch) 
             # Resnet18 - 2blocks
-            elif arch == 'resnet_2blocks':
-                resnet = getattr(resnet_2b, arch)
-                print("Architecture selected - Resnet18_2Blocks")
+            elif self.arch == 'resnet18_2blocks':
+                resnet = resnet_2blocks(pretrained=False)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch)
             # Resnet18 - 1block
-            elif arch == 'resnet_1block':
-                resnet = getattr(resnet_1b, arch)
-                print("Architecture selected - Resnet18_1Block")
-            encoder = resnet(first_conv=True, maxpool1=True, return_all_feature_maps=False)
+            elif self.arch == 'resnet18_1block':
+                resnet = resnet_1block(pretrained=False)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch)
+
         else:
             NotImplementedError("Encoder not implemented.")
 
-        return encoder
+        return resnet
 
 class BYOL(pl.LightningModule):
     """
@@ -146,6 +148,7 @@ class BYOL(pl.LightningModule):
         num_workers: int = 0,
         warmup_epochs: int = 10,
         max_epochs: int = 100,
+        backbone: str = 'resnet18',
         **kwargs
     ):
         """
@@ -161,8 +164,8 @@ class BYOL(pl.LightningModule):
         """
         super().__init__()
         self.save_hyperparameters()
-        
-        self.online_network = SiameseArm()
+        self.backbone = backbone
+        self.online_network = SiameseArm(backbone=backbone)
         self.target_network = deepcopy(self.online_network)
         self.weight_callback = BYOLMAWeightUpdate()
 
@@ -175,8 +178,6 @@ class BYOL(pl.LightningModule):
         return y
 
     def shared_step(self, batch, batch_idx):
-        #print(len(batch)) # temporal: list of length 3
-        #print(batch_idx)
         if len(batch) == 3:
             img_1, img_2, _ = batch
         else:
@@ -247,15 +248,7 @@ class BYOL(pl.LightningModule):
 
         return parser
 
-# global variable
-arch = 'resnet_2blocks'
-
 def cli_main():
-    from pl_bolts.models.self_supervised.simclr import (
-        SimCLREvalDataTransform, SimCLRTrainDataTransform)
-
-    # global variable to hold the type of architecture
-    global arch
 
     parser = ArgumentParser()
     parser.add_argument(
@@ -277,14 +270,9 @@ def cli_main():
     )
     parser.add_argument(
         "--dataset_size",
+        default=-1,
         type=int,
-        default=0,
-        help="Subset of dataset"
-    )
-    parser.add_argument(
-        "--project_name",
-        type=str,
-        help="wandb dashboard project name"
+        help="number of training samples. -1 (default)=entire dataset"
     )
     parser.add_argument(
         "--seed_val",
@@ -293,10 +281,26 @@ def cli_main():
         help="SEED VALUE"
     )
     parser.add_argument(
-        "--architecture",
+        "--backbone",
         type=str,
-        choices=['resnet34','resnet18','resnet_3blocks','resnet_2blocks','resnet_1block'],
-        help="select architecture"
+        choices=['resnet34','resnet18','resnet18_3blocks','resnet18_2blocks','resnet18_1block'],
+        help="select backbone"
+    )
+    parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="shuffle training samples"
+    )
+    parser.add_argument(
+        "--print_model",
+        action="store_true",
+        help="display backbone"
+    )
+    parser.add_argument(
+        "--aug",
+        type=bool,
+        default=True,
+        help="apply augmentations to training samples"
     )
 
     # model args
@@ -304,41 +308,25 @@ def cli_main():
     args = parser.parse_args()
     args.gpus = 1
     args.lars_wrapper = True
-
-    arch = args.architecture
-
-    """
-        IMPORTANT:
-            gaussian_blur is commented below and in arguments of this file,
-            jitter_strength is commented below and in arguments of this file
-            
-            comment them out for non-temporal byol models else result will
-            differ from original results
-    """
  
     dm = ImageFolderDataModule(
-            data_dir=args.data_dir,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            shuffle=True,
-            drop_last=False, # changed from True to False becz of empty dataloader error
-            val_split=args.val_split,
-            dataset_size=args.dataset_size,
+        data_dir=args.data_dir,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        shuffle=args.shuffle,
+        drop_last=False,
+        val_split=args.val_split,
+        dataset_size=args.dataset_size,
+    )
+
+    if args.aug is True:
+        dm.train_transforms = SimCLRTrainDataTransform(
+            input_height=dm.size()[-1],
         )
-    
-    print("shuffle is - ", dm.shuffle)
 
-    dm.train_transforms = SimCLRTrainDataTransform(
-        input_height=dm.size()[-1],
-        #gaussian_blur=args.gaussian_blur,
-        #jitter_strength=args.jitter_strength,
-    )
-
-    dm.val_transforms = SimCLREvalDataTransform(
-        input_height=dm.size()[-1],
-        #gaussian_blur=args.gaussian_blur,
-        #jitter_strength=args.jitter_strength,
-    )
+        dm.val_transforms = SimCLREvalDataTransform(
+            input_height=dm.size()[-1],
+        )
 
     pl.seed_everything(args.seed_val)
 
@@ -357,8 +345,11 @@ def cli_main():
         callbacks=callbacks,
     )
     
-    #print(model)
-    trainer.fit(model, datamodule=dm)
+    if args.print_model:
+        print(model)
+    
+    # train model
+    trainer.fit(model, datamodule=dm) 
 
 if __name__ == '__main__':
     cli_main()

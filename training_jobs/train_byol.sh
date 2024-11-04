@@ -1,16 +1,21 @@
 viewpoint=V11O2
 
-for viewpoint in fork_0 ship_0
+for viewpoint in train1_80k
 do
     python3 ../train_byol.py \
         --max_epochs 100 \
         --batch_size 512 \
-        --data_dir /data/lpandey/Wood2024_LineDrawings_Dataset/Exp2/training/lines/${viewpoint} \
+        --data_dir /data/lpandey/UT_Austin_EgocentricDataset/output_64x64Squished/${viewpoint} \
         --seed_val 0 \
         --dataset_size 80000 \
-        --architecture 'resnet_2blocks' \
-        --val_split 0.01 --exp_name paper_Lines/Exp2/byol10L/training_lines/${viewpoint}
+        --backbone resnet18_2blocks \
+        --val_split 0.01 \
+        --shuffle \
+        --aug False \
+        --print_model \
+        --exp_name test_runs_nov3/${viewpoint}
 done
 
-        # --jitter_strength 0.5 \
-        # --gaussian_blur \
+# NOTES :
+# --shuffle \
+# --print_model \

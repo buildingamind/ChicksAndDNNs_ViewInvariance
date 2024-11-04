@@ -11,7 +11,7 @@ do
 	--backbone resnet18_2blocks \
         --shuffle \
         --val_split 0.013 \
-        --aug False \
+        --aug True \
         --exp_name test_runs_nov3/${viewpoint}
 done
 
