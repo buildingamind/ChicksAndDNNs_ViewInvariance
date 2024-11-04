@@ -1,26 +1,14 @@
-from typing import Any, Callable, Optional, Sequence, Union
+'''
+creates a generic dataloader for non-temporal learning
+'''
 
+# IMPORTS
+from typing import Any, Callable, Optional, Sequence, Union
 import torch
-from pytorch_lightning import LightningDataModule
-from torch.utils.data import DataLoader, Dataset, random_split
 import torchvision.transforms as T
 from torchvision.datasets import ImageFolder
-
 from pl_bolts.datamodules.vision_datamodule import VisionDataModule
-from PIL import Image
 
-"""
-A generic data loader where the images are arranged in this way by default: ::
-
-        root/dog/xxx.png
-        root/dog/xxy.png
-        root/dog/[...]/xxz.png
-
-        root/cat/123.png
-        root/cat/nsdf3.png
-        root/cat/[...]/asd932_.png
-
-"""
 
 class ImageFolderDataModule(VisionDataModule):
     name = "image_folder"
@@ -38,7 +26,7 @@ class ImageFolderDataModule(VisionDataModule):
         shuffle: bool = True, 
         pin_memory: bool = False,
         drop_last: bool = False,
-        dataset_size: int = 0,                            # dataset size AUTOMATION
+        dataset_size: int = -1,                     
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -50,6 +38,7 @@ class ImageFolderDataModule(VisionDataModule):
             normalize: If true applies image normalize
             batch_size: How many samples per batch to load
             seed: Random seed to be used for train/val/test splits
+            dataset_size: total number of training samples. If set to -1, then take the entire dataset for training
             shuffle: If true shuffles the train data every epoch
             pin_memory: If true, the data loader will copy Tensors into CUDA pinned memory before
                         returning them
@@ -69,7 +58,8 @@ class ImageFolderDataModule(VisionDataModule):
             **kwargs,
         )
         self.dataset_size = dataset_size
-        print("shuffle inside datamodule is: ", shuffle)
+        print("[INFO] Shuffle training samples set to :: ", shuffle)
+
     """
     _split_dataset is an inbuilt method from VisionDataModule.
     Check -  https://github.com/Lightning-AI/lightning-bolts/blob/master/pl_bolts/datamodules/vision_datamodule.py
@@ -79,7 +69,7 @@ class ImageFolderDataModule(VisionDataModule):
     def num_samples(self):
         dataset = self.dataset_cls(self.data_dir) # same as dataset = ImageFolder(data_dir)
         print(dataset)
-        return len(self._split_dataset(dataset)) # returns the value 9800 for 10k and 98,000 for 100k image dataset, based on val_split i.e. 0.002
+        return len(self._split_dataset(dataset)) # returns num of training samples only
         #return dataset # returns the length of entire dataset i.e 10k
 
         
@@ -102,26 +92,18 @@ class ImageFolderDataModule(VisionDataModule):
             dataset_val = self.dataset_cls(
                 self.data_dir, transform=val_transforms
             )
-            
-            '''
-            import matplotlib.pyplot as plt
-
-            plt.imshow(my_tensor.numpy()[0], cmap='gray')
-            '''
-
-            
-            # DATASET SIZE AUTOMATION CONDITION
-            
-            # if no size passed, then take the entire dataset and split between train and val set
-            if self.dataset_size is 0:
+        
+                        
+            # if using the entire dataset
+            if self.dataset_size == -1:
                 # Split
-                print("Note: entire dataset is used for training\n")
+                print("[INFO] Using entire dataset for training the model")
                 self.dataset_train = self._split_dataset(dataset_train)
                 self.dataset_val = self._split_dataset(dataset_val, train=False)
                 
-            # otherwise, take subset of the data
+            # using a subset of the dataset
             else:
-            
+                print("[INFO] Not using the dataset for training the model")
                 # last_index takes care of the val_split difference
                 last_index = int(self.dataset_size - (self.dataset_size * self.val_split))
                 
@@ -132,10 +114,10 @@ class ImageFolderDataModule(VisionDataModule):
                 self.dataset_val = torch.utils.data.Subset(dataset_val, val_indices)
 
             
-            print("size of dataset_train: ",len(self.dataset_train))
-            print("size of dataset_val: ",len(self.dataset_val))
+            print("[INFO] Total Training Samples :: ",len(self.dataset_train))
+            print("[INFO] Total Validation Samples :: ",len(self.dataset_val))
 
-
+        # this stage will never be called while training a self-supervised backbone in this script
         if stage == "test" or stage is None:
             test_transforms = self.default_transforms() if self.test_transforms is None else self.test_transforms
             self.dataset_test = self.dataset_cls(

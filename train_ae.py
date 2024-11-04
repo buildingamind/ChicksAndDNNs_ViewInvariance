@@ -1,3 +1,4 @@
+# IMPORTS
 import os
 from argparse import ArgumentParser
 
@@ -8,9 +9,9 @@ from pl_bolts import _HTTPS_AWS_HUB
 from pl_bolts.models.autoencoders.components import (resnet18_decoder,
                                                      resnet18_encoder,
                                                      resnet50_decoder,
-                                                     resnet50_encoder) # these imports are directly from library
+                                                     resnet50_encoder)
 
-# importing resnet-34, resnet18_3blocks, resnet18_2blocks architecture  - 
+# importing resnet-34, resnet18_3blocks, resnet18_2blocks architectures  - 
 from models.archs.ae_component_resnet34 import resnet34_encoder, resnet34_decoder
 from models.archs.ae_component_3b import resnet18_encoder_3b, resnet18_decoder_3b
 from models.archs.ae_component_2b import resnet18_encoder_2b, resnet18_decoder_2b
@@ -23,8 +24,7 @@ from torch.nn import functional as F
 from datamodules import ImageFolderDataModule
 
 
-from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
-from train_simclr import SimCLR
+from pytorch_lightning.loggers import TensorBoardLogger
 
 
 class AE(pl.LightningModule):
@@ -60,7 +60,7 @@ class AE(pl.LightningModule):
         """
         Args:
             input_height: height of the images
-            enc_type: option between resnet18 or resnet50
+            enc_type: option between resnet18 or resnet50 or custom architectures
             first_conv: use standard kernel_size 7, stride 2 at start or
                 replace it with kernel_size 3, stride 1 conv
             maxpool1: use standard maxpool to reduce spatial dim of feat by a factor of 2
@@ -92,15 +92,15 @@ class AE(pl.LightningModule):
                 'enc': resnet34_encoder,
                 'dec': resnet34_decoder,
             },
-            'resnet18_3b': {                    # resnet18_3blocks
+            'resnet18_3b': {                    # resnet18_3blocks (custom)
                 'enc': resnet18_encoder_3b,
                 'dec': resnet18_decoder_3b,
             },
-            'resnet18_2b': {                    # resnet18_2blocks
+            'resnet18_2b': {                    # resnet18_2blocks (custom)
                 'enc': resnet18_encoder_2b,
                 'dec': resnet18_decoder_2b,
             },
-            'resnet18_1b': {                    # resnet18_1block
+            'resnet18_1b': {                    # resnet18_1block (custom)
                 'enc': resnet18_encoder_1b,
                 'dec': resnet18_decoder_1b,
             },
@@ -117,7 +117,7 @@ class AE(pl.LightningModule):
 
         self.fc = nn.Linear(self.enc_out_dim, self.latent_dim)
 
-        print("Architecture selected: ", enc_type)
+        print("[INFO] Resnet Backbone Selected :: ", enc_type)
 
     @staticmethod
     def pretrained_weights_available():
@@ -161,7 +161,7 @@ class AE(pl.LightningModule):
     def add_model_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
 
-        parser.add_argument("--enc_type", type=str, default='resnet18', choices=['resnet18', 'resnet34', 'resnet18_3b', 'resnet18_2b', 'resnet18_1b','simclr'])
+        parser.add_argument("--enc_type", type=str, default='resnet18', choices=['resnet50', 'resnet34', 'resnet18', 'resnet18_3b', 'resnet18_2b', 'resnet18_1b'])
         parser.add_argument("--first_conv", action='store_false')
         parser.add_argument("--maxpool1", action='store_false')
         parser.add_argument("--lr", type=float, default=1e-4)
@@ -202,14 +202,9 @@ def cli_main(args=None):
     )
     parser.add_argument(
         "--dataset_size",
-        default=0,
+        default=-1,
         type=int,
-        help="Subset of dataset"
-    )
-    parser.add_argument(
-        "--project_name",
-        type=str,
-        help="wandb dashboard project name"
+        help="number of training samples. -1 (default)=entire dataset"
     )
     parser.add_argument(
         "--seed_val",
@@ -217,6 +212,17 @@ def cli_main(args=None):
         default=0,
         help="SEED VALUE"
     )
+    parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="shuffle training samples"
+    )
+    parser.add_argument(
+        "--print_model",
+        action="store_true",
+        help="display backbone"
+    )
+
 
     parser = AE.add_model_specific_args(parser)
     args = parser.parse_args(args)
@@ -225,8 +231,8 @@ def cli_main(args=None):
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        shuffle=True,
-        drop_last=False, # changed from True to False becz of empty dataloader error
+        shuffle=args.shuffle,
+        drop_last=False,
         val_split=args.val_split,
         dataset_size=args.dataset_size,
     )
@@ -250,18 +256,13 @@ def cli_main(args=None):
         callbacks=callbacks,
     )
 
-    #print(model)
+    if args.print_model:
+        print(model)
+    
+    # train model
     trainer.fit(model, datamodule=dm) 
     
 
 
 if __name__ == "__main__":
     cli_main()
-
-'''
-changes for one shot encoder - 
-1. monitoring train_loss instead of val_loss.
-2. def validation_step() function is in comments to remove validation step.
-'''
-
-

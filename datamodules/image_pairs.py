@@ -1,9 +1,9 @@
-# FIXME: for 0 division error fix that with some error handling statements inside the drop ep function.
+'''
+This script loads data for temporal learning models such as
+SimCLR-CLTT and ViT-CoT models
+'''
 
-
-# Method#2 implemented script for paper#2 temporal models
-# print the temporal mode while running for a sanity check.
-
+# IMPORTS
 import os
 from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
@@ -11,10 +11,6 @@ import torchvision.transforms as T
 from PIL import Image
 from pl_bolts.datamodules.vision_datamodule import VisionDataModule
 from torchvision.datasets import VisionDataset
-
-from .imagefolder_datamodule import ImageFolderDataModule
-import torch
-import random
 
 
 class ImagePairs(VisionDataset):
