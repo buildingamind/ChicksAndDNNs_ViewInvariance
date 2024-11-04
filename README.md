@@ -6,6 +6,8 @@
 <p align="center">†S.M.W.W. and J.N.W. contributed equally to this work.</p>
 
 
-<h2 align="center">Accepted Journal: PLoS Computational Biology</h2>
+<h2 align="center">Accepted Journal: PLoS Computational Biology, 2024</h2>
 
 <img src='./media/banner.png'>
+
+

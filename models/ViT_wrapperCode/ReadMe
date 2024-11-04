@@ -1,0 +1,3 @@
+The code inside this directory is the code for the wrapper classes for vision transformer model.
+This code is the source code from HuggingFace and a trusted opensource library (link - https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit.py)
+
