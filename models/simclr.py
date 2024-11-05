@@ -173,24 +173,26 @@ class SimCLR(pl.LightningModule):
             # Resnet34, Resnet18
             if self.arch == 'resnet34' or self.arch == 'resnet18':
                 resnet = getattr(resnets, self.arch)
-                print("Architecture selected - ", self.arch)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch)
+                encoder = resnet(first_conv=True, maxpool1=True, pretrained=False, return_all_feature_maps=False)
+                return encoder
             # Resnet18 - 3blocks
-            elif self.arch == 'resnet_3blocks':
-                resnet = getattr(resnet_3b, self.arch)
-                print("Architecture selected - Resnet18_3Blocks")
+            elif self.arch == 'resnet18_3blocks':
+                resnet = resnet_3blocks(pretrained=False)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch) 
             # Resnet18 - 2blocks
-            elif self.arch == 'resnet_2blocks':
-                resnet = getattr(resnet_2b, self.arch)
-                print("Architecture selected - Resnet18_2Blocks")
+            elif self.arch == 'resnet18_2blocks':
+                resnet = resnet_2blocks(pretrained=False)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch)
             # Resnet18 - 1block
-            elif self.arch == 'resnet_1block':
-                resnet = getattr(resnet_1b, self.arch)
-                print("Architecture selected - Resnet18_1Block")
-            encoder = resnet(first_conv=self.first_conv, maxpool1=self.maxpool1, return_all_feature_maps=False)
+            elif self.arch == 'resnet18_1block':
+                resnet = resnet_1block(pretrained=False)
+                print("[INFO] Resnet Backbone Selected :: ", self.arch)
+
         else:
             NotImplementedError("Encoder not implemented.")
 
-        return encoder
+        return resnet
 
 
     '''

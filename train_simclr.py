@@ -1,15 +1,15 @@
+# IMPORTS
 from argparse import ArgumentParser
-
 import pytorch_lightning as pl
 from pl_bolts.models.self_supervised.simclr.transforms import (
-    SimCLREvalDataTransform, SimCLRTrainDataTransform)
+    SimCLREvalDataTransform, 
+    SimCLRTrainDataTransform
+    )
 from pytorch_lightning.callbacks import ModelCheckpoint
-#from pytorch_lightning.loggers import TensorBoardLogger
-
-from datamodules import ImageFolderDataModule, ImagePairsDataModule
+from datamodules import ImagePairsDataModule
 from models.simclr import SimCLR
-from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
-from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.loggers import TensorBoardLogger
+import torchvision.transforms as T
 
 
 
@@ -34,7 +34,6 @@ def create_argparser():
         type=int,
         help="supported images :: 224X224 and 64X64"
     )
-    
     parser.add_argument(
         "--temporal",
         action="store_true",
@@ -42,7 +41,7 @@ def create_argparser():
     )
     parser.add_argument(
         "--window_size",
-        #default=2,
+        default=3,
         type=int,
         help="Size of sliding window for sampling temporally ordered image pairs."
     )
@@ -52,15 +51,19 @@ def create_argparser():
         help="Experiment name"
     )
     parser.add_argument(
-        "--dataset_size",
-        default=0,
-        type=int,
-        help="Subset of dataset"
+        "--shuffle_frames",
+        action="store_true",
+        help="shuffle temporal images for training"
     )
     parser.add_argument(
-        "--project_name",
-        type=str,
-        help="wandb dashboard project name"
+        "--shuffle_temporalWindows",
+        action="store_true",
+        help="shuffle temporal images for training"
+    )
+    parser.add_argument(
+        "--dataloader_shuffle",
+        action="store_true",
+        help="shuffle temporal images for training"
     )
     parser.add_argument(
         "--seed_val",
@@ -69,30 +72,35 @@ def create_argparser():
         help="SEED VALUE"
     )
     parser.add_argument(
-        "--shuffle",
-        type=bool,
-        default=False,
-        help="shuffle temporal images for training"
-    )
-    parser.add_argument(
-        "--architecture",
+        "--backbone",
         type=str,
-        choices=['resnet34','resnet18','resnet_3blocks','resnet_2blocks','resnet_1block'],
+        choices=['resnet34','resnet18','resnet18_3blocks','resnet18_2blocks','resnet18_1block'],
         help="select architecture"
     )
     parser.add_argument(
-        "--temporal_mode",
-        type=str,
-        choices=['2+images', '2images'],
-        help="select how many images to push together"
+        "--dataset_size",
+        type=int,
+        default=-1,
+        help="num of training samples to use from dataset. -1 = entire dataset"
     )
     parser.add_argument(
-        "--drop_ep",
-        type=int,
-        default=0,
-        help="how many episodes to drop from the dataset. If there are is only one subfolder in the dataset, then set this to 0"
+        "--loss_ver",
+        type=str,
+        choices=['v0','v1'],
+        default='v0',
+        help="select btw CLTT loss version 0 and loss version 1. Same objectives but different implementations"
     )
-
+    parser.add_argument(
+        "--print_model",
+        action="store_true",
+        help="display backbone"
+    )
+    parser.add_argument(
+        "--aug",
+        type=bool,
+        default=True,
+        help="apply augmentations to training samples"
+    )
     
     return parser
 
@@ -100,8 +108,6 @@ def create_argparser():
 
 def cli_main():
     
-
-    print("ALERT!! CHECK IMAGE SIZE IN DATA HANDLER FIRST!!")
     parser = create_argparser()
 
     # model args
@@ -109,56 +115,34 @@ def cli_main():
     args = parser.parse_args()
     args.gpus = 1
     args.lars_wrapper = True
-    args.arch = args.architecture
+    args.arch = args.backbone
 
-
-
-    # custom callback to early stop training 
-    # class EarlyStopTraining(Callback):
-    #     def on_epoch_end(self, trainer, pl_module):
-            
-    #         if trainer.current_epoch == args.early_stop_epoch and args.early_stop_epoch != 0:
-    #             print(f"Epoch {trainer.current_epoch} is the early stopping epoch. Stopping training.")
-    #             trainer.save_checkpoint("final_checkpoint.ckpt")
-    #             trainer.should_stop = True  # Stop training
 
     if args.temporal:
         dm = ImagePairsDataModule(
             data_dir=args.data_dir,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
-            shuffle=False, # shuffle is decided using arg flag
-            drop_last=False, # changed from True to False becz of empty dataloader error
+            shuffle_frames = args.shuffle_frames,
+            shuffle_temporalWindows = args.shuffle_temporalWindows,
+            dataloader_shuffle = args.dataloader_shuffle,
+            drop_last=False,
             val_split=args.val_split,
             window_size=args.window_size,
-            temporal_mode=args.temporal_mode,
-            drop_ep=args.drop_ep,
-        )
-
-    else:
-        dm = ImageFolderDataModule(
-            data_dir=args.data_dir,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers,
-            shuffle=False,
-            drop_last=False, # changed from True to False becz of empty dataloader error
-            val_split=args.val_split,
             dataset_size=args.dataset_size,
+            gpus=args.gpus,
+            transform=T.ToTensor(),
         )
 
+    if args.aug is True:
+        dm.train_transforms = SimCLRTrainDataTransform(
+            input_height=64, # FIXME hardcoded value
 
+        )
+        dm.val_transforms = SimCLREvalDataTransform(
+            input_height=64, # FIXME hardcoded value
 
-    dm.train_transforms = SimCLRTrainDataTransform(
-        input_height=dm.size()[-1],
-        # gaussian_blur=args.gaussian_blur,
-        # jitter_strength=args.jitter_strength,
-    )
-
-    dm.val_transforms = SimCLREvalDataTransform(
-        input_height=dm.size()[-1],
-        # gaussian_blur=args.gaussian_blur,
-        # jitter_strength=args.jitter_strength,
-    )
+        )
 
     # The SimCLR data transforms are designed to be used with datamodules
     # which return a single image. But ImagePairsDataModule returns
@@ -169,7 +153,7 @@ def cli_main():
 
     pl.seed_everything(args.seed_val)
 
-    args.num_samples = dm.num_samples
+    args.num_samples = 80000 # FIXME hardcoded value
 
     model = SimCLR(**args.__dict__)
 
@@ -187,7 +171,10 @@ def cli_main():
     )
 
 
-    #print(model)
+    if args.print_model:
+        print(model)
+    
+    # train model
     trainer.fit(model, datamodule=dm)
 
 
