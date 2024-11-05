@@ -253,6 +253,5 @@ done
 
 ## Experiment V
 
-Here, Experiments I - IV were repeated with a different training dataset <a src="https://vision.cs.utexas.edu/projects/egocentric_data/UT_Egocentric_Dataset.html">(Human Egocentric Dataset)</a>, instead of chick datasets.
 
-Here, Experiments I–IV were repeated using a different training dataset, the <a src="https://vision.cs.utexas.edu/projects/egocentric_data/UT_Egocentric_Dataset.html">Human Egocentric Dataset</a>, instead of the chick datasets.
+Here, Experiments I–IV were repeated using a different training dataset, the <a href="https://vision.cs.utexas.edu/projects/egocentric_data/UT_Egocentric_Dataset.html">Human Egocentric Dataset</a>, instead of the chick datasets.
