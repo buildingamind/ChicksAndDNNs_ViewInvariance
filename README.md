@@ -8,6 +8,14 @@
 
 <h2 align="center">Accepted Journal: PLoS Computational Biology, 2024</h2>
 
+<div align="center">
+
+<a href="https://www.buildingamind.com/">Our Lab Website</a> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+<a href="https://building-a-mind.vercel.app/">Our Project Website</a> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+<a href="">Paper</a> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+<a href="">Dataset</a>
+
+</div>
 <img src='./media/banner.png'>
 
 # Directory Organization
@@ -105,7 +113,8 @@ pip3 install -r requirements_production.txt
 
 <br>
 
-# Experiments
+# Experiments (Model Training Phase)
+In this section, we show how the different visual encoders are trained using self-supervised learning
 
 <p>Below, we systematically present the experiments conducted in this paper. Each model was trained with three different seeds, and we provide checkpoints for all trained models. Under each experiment, you will find a table listing the model details, followed by an example bash script to replicate the experiment. Use the bash scripts located in the training_jobs directory to train each model.</p>
 
@@ -255,3 +264,9 @@ done
 
 
 Here, Experiments I–IV were repeated using a different training dataset, the <a href="https://vision.cs.utexas.edu/projects/egocentric_data/UT_Egocentric_Dataset.html">Human Egocentric Dataset</a>, instead of the chick datasets.
+
+# Experiments (Model Testing Phase)
+
+In this section, we show how different visual encoders are frozen after training and tested using a linear probe.
+
+Note to self: show two examples having distinct settings.
