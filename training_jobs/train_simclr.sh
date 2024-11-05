@@ -13,6 +13,7 @@ do
         --window_size 3 \
         --val_split 0.05 \
         --aug False \
+        --loss_ver v0 \
         --exp_name test_runs_nov3/${viewpoint}
 done
 

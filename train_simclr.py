@@ -134,14 +134,14 @@ def cli_main():
             transform=T.ToTensor(),
         )
 
+    height, width, num_samples = dm.get_info()
+
     if args.aug is True:
         dm.train_transforms = SimCLRTrainDataTransform(
-            input_height=64, # FIXME hardcoded value
-
+            input_height=height,
         )
         dm.val_transforms = SimCLREvalDataTransform(
-            input_height=64, # FIXME hardcoded value
-
+            input_height=height,
         )
 
     # The SimCLR data transforms are designed to be used with datamodules
@@ -153,7 +153,8 @@ def cli_main():
 
     pl.seed_everything(args.seed_val)
 
-    args.num_samples = 80000 # FIXME hardcoded value
+    args.num_samples = num_samples
+
 
     model = SimCLR(**args.__dict__)
 

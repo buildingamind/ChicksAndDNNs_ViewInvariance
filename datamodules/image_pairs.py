@@ -165,9 +165,6 @@ class ImagePairsDataModule(pl.LightningDataModule):
     name = "image_pairs"
     dataset_cls = ImagePairs # this is alias of pl_bolts.datasets.emnist_dataset.BinaryEMNIST
     #dims = (3, 64, 64)
-    #dims = (3, 224, 224)
-
-    #print("[INFO] Image resolution set in DataLoader script :: ", dims)
 
     def __init__(
         self,
@@ -223,6 +220,22 @@ class ImagePairsDataModule(pl.LightningDataModule):
     def prepare_data(self, ):
         # Here you can download or preapre your data if needed
         pass
+    
+    """Returns the height and width of a sample image in the dataset."""
+    """Returns the number of samples in the training dataset."""
+    def get_info(self, ):
+        dataset = self.dataset_cls(
+            root=self.data_dir,
+            window_size=self.window_size,
+            shuffle_frames=self.shuffle_frames,
+            shuffle_temporalWindows=self.shuffle_temporalWindows,
+            dataset_size=self.dataset_size,
+            transform=self.transform
+        )
+
+        sample, *_ = dataset[0]  # Get the first sample image
+        height, width = sample.shape[1:]
+        return height, width, len(dataset)
 
     def setup(self, stage: Optional[str] = None):
         if stage == 'fit' or stage is None:

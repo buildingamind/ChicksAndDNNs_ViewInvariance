@@ -5,7 +5,7 @@ from typing import Callable, Optional
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from pl_bolts.optimizers.lars_scheduling import LARSWrapper
+#from pl_bolts.optimizers.lars_scheduling import LARSWrapper
 from pytorch_lightning.core.optimizer import LightningOptimizer
 from torch import nn
 from torch.nn import functional as F
@@ -84,15 +84,16 @@ class SimCLR(pl.LightningModule):
         batch_size: int,
         num_nodes: int = 1,
         arch: str = 'resnet18',
-        temporal_mode: str = None,
+        window_size: int = 3,
+        loss_ver: str = 'v0',
         hidden_mlp: int = 512,
         hidden_depth: int = 1,
         feat_dim: int = 128,
         warmup_epochs: int = 5,
         max_epochs: int = 100,
         temperature: float = 0.1,
-        first_conv: bool = True, # changed from True to False
-        maxpool1: bool = True, # changed from True to False
+        first_conv: bool = True, 
+        maxpool1: bool = True,
         optimizer: str = 'adam',
         lars_wrapper: bool = True,
         exclude_bn_bias: bool = False,
@@ -117,7 +118,8 @@ class SimCLR(pl.LightningModule):
         self.gpus = gpus
         self.num_nodes = num_nodes
         self.arch = arch
-        self.temporal_mode = temporal_mode
+        self.window_size = window_size
+        self.loss_ver = loss_ver
         self.num_samples = num_samples
         self.batch_size = batch_size
 
@@ -148,7 +150,6 @@ class SimCLR(pl.LightningModule):
             depth=self.hidden_depth,
         )
 
-        # FIXME: update this to dynammic optimization to eliminate out-of-index error.
         # compute iters per epoch
         nb_gpus = len(self.gpus) if isinstance(gpus, (list, tuple)) else self.gpus
         assert isinstance(nb_gpus, int)
@@ -167,6 +168,7 @@ class SimCLR(pl.LightningModule):
         ])
 
         self.lr_schedule = np.concatenate((warmup_lr_schedule, cosine_lr_schedule))
+
 
     def init_encoder(self):
         if self.arch.startswith('resnet'):
@@ -208,77 +210,88 @@ class SimCLR(pl.LightningModule):
         return self.backbone(x)
 
     def shared_step(self, batch):
-        # push two images together in a temporal window - 
 
-        if self.temporal_mode == '2images':
-            # len(batch) = 3 for temporal model
-            if len(batch) == 3:
-                img1, img2, _ = batch # (img1, img2, index)
+        # loss version v0
+        if self.loss_ver == 'v0':
+            # PUSH TWO IMAGES TOGETHER IN THE EMBEDDING SPACE
+            if self.window_size < 3:
+                if len(batch) == 3:
+                    img1, img2, _ = batch   # returns img1, img2, index
+
+                else:
+                    # final image in tuple is for online eval
+                    (img1, img2, _), _ = batch
+
+                # get h representations, bolts resnet returns a list
+                h1 = self.backbone(img1)
+                h2 = self.backbone(img2)
+
+                # get z representations
+                z1 = self.projection(h1)
+                z2 = self.projection(h2)
+
+                loss = self.nt_xent_loss(z1, z2, self.temperature)
+            
+            # PUSH MORE THAN TWO IMAGES TOGETHER IN THE EMBEDDING SPACE 
             else:
-                # final image in tuple is for online eval
-                (img1, img2, _), _ = batch
+                #print(type(batch)) --> <class 'list'>
+                #print(len(batch)) #len = 4 for window_size = 3 --> [img1, img2, img3, index]
 
-            # get h representations, bolts resnet returns a list
-            h1 = self(img1)
-            h2 = self(img2)
+                # if window_size 3
+                if len(batch) == 4:
+                    flag = 0
+                    img1, img2, img3, _ = batch # [img1, img2, img3, index]
 
-            # get z representations
-            z1 = self.projection(h1)
-            z2 = self.projection(h2)
+                # if window_size = 4
+                else:
+                    flag = 1
+                    img1, img2, img3, img4, _ = batch # [img1, img2, img3, img4, index]
+                    
+                # get h representations, bolts resnet returns a list
+                h1, h2, h3 = self.backbone(img1), self.backbone(img2), self.backbone(img3)
 
-            loss = self.nt_xent_loss(z1, z2, self.temperature)
+                    
+                if flag == 1:
+                    h4 = self.backbone(img4)
+                    z4 = self.projection(h4)
+                        
+
+                # get z representations
+                z1, z2, z3 = self.projection(h1), self.projection(h2), self.projection(h3)
+
+                # push z1 and z2 together
+                l1 = self.nt_xent_loss(z1,z2, self.temperature)
+                # push z1 and z3 together
+                l2 = self.nt_xent_loss(z1,z3, self.temperature)
+                if flag == 1:
+                    l3 = self.nt_xent_loss(z1,z4, self.temperature)
+                        
+                    # gather losses - 
+                    loss = (l1+l2+l3)
+                else:
+                    # gather losses - 
+                    loss = (l1+l2)
         
-        # push 2+ images in a temporal window - 
+         # loss version v1
         else:
-            # window_size = 3
-            if len(batch) == 4:
-                flag = 0
-                img1, img2, img3, _ = batch # (img1, img2, img3, index)
-                #print(img1.shape)
-                
-            # window_size = 4
-            else:
-                flag = 1
-                img1, img2, img3, img4, _ = batch # (img1, img2, img3, img4, index)
-                
+            # window_size 3
+            img1, img2, img3, _ = batch
+
             # get h representations, bolts resnet returns a list
-            h1 = self(img1)
-            h2 = self(img2)
-            h3 = self(img3)
-                
-            if flag == 1:
-                h4 = self(img4)
-                z4 = self.projection(h4)
-                    
+            h1, h2, h3 = self.backbone(img1), self.backbone(img2), self.backbone(img3)
 
             # get z representations
-            z1 = self.projection(h1)
-            z2 = self.projection(h2)
-            z3 = self.projection(h3)
+            z1, z2, z3 = self.projection(h1), self.projection(h2), self.projection(h3)
 
-            # loss between z1 and other neighboring samples
-            l1 = self.nt_xent_loss(z1,z2, self.temperature) # remember that a batch of images is passed to the loss function, not a single image is passed.
-            l2 = self.nt_xent_loss(z1,z3, self.temperature)
-            if flag == 1:
-                l3 = self.nt_xent_loss(z1,z4, self.temperature)
-                    
-                # gather losses - 
-                loss = (l1+l2+l3)
-            else:
-                # gather losses - 
-                loss = (l1+l2)
+            loss = self.nt_xent_loss_triplet(z1, z2, z3, self.temperature)
 
         return loss
-    
 
     def training_step(self, batch, batch_idx):
         loss = self.shared_step(batch)
-        # # Must clear cache at a regular interval
-        # if self.global_step % 10 == 0:
-        #     torch.cuda.empty_cache()
+        #print("loss in training step contiguous status: ", loss.is_contiguous())
+
         # log LR (LearningRateLogger callback doesn't work with LARSWrapper)
-        # if self.current_epoch == 5:
-        #     raise StopIteration("Training stopped at epoch {}".format(self.current_epoch))
         self.log('learning_rate', self.lr_schedule[self.trainer.global_step], on_step=True, on_epoch=False)
 
         self.log('train_loss', loss, on_step=True, on_epoch=False)
@@ -321,12 +334,12 @@ class SimCLR(pl.LightningModule):
         elif self.optim == 'adam':
             optimizer = torch.optim.Adam(params, lr=self.learning_rate, weight_decay=self.weight_decay)
 
-        if self.lars_wrapper:
-            optimizer = LARSWrapper(
-                optimizer,
-                eta=0.001,  # trust coefficient
-                clip=False
-            )
+        # if self.lars_wrapper:
+        #     optimizer = LARSWrapper(
+        #         optimizer,
+        #         eta=0.001,  # trust coefficient
+        #         clip=False
+        #     )
 
         return optimizer
 
@@ -343,8 +356,7 @@ class SimCLR(pl.LightningModule):
     ) -> None:
         # warm-up + decay schedule placed here since LARSWrapper is not optimizer class
         # adjust LR of optim contained within LARSWrapper
-        for param_group in optimizer.param_groups:
-            # print(len(self.lr_schedule))
+        for param_group in optimizer.optimizer.param_groups:
             param_group["lr"] = self.lr_schedule[self.trainer.global_step]
 
         # from lightning
@@ -353,6 +365,8 @@ class SimCLR(pl.LightningModule):
             optimizer = LightningOptimizer.to_lightning_optimizer(optimizer, self.trainer)
         optimizer.step(closure=optimizer_closure)
 
+
+    # Loss version 0 implementation
     def nt_xent_loss(self, out_1, out_2, temperature, eps=1e-6):
         """
             assume out_1 and out_2 are normalized
@@ -399,13 +413,59 @@ class SimCLR(pl.LightningModule):
         loss = -torch.log(pos / (neg + eps)).mean() # num/den
 
         return loss
+    
+    # Loss version 1 implementation
+    def nt_xent_loss_triplet(self, out_1, out_2, out_3, temperature, eps=1e-6):
+        """
+        Normalized Temperature-scaled Cross Entropy (NT-Xent) loss for triplets of samples.
+        
+        Args:
+        - out_1: Tensor of shape [batch_size, dim], first sample representations
+        - out_2: Tensor of shape [batch_size, dim], second sample representations
+        - out_3: Tensor of shape [batch_size, dim], third sample representations
+        - temperature: Floating point value, temperature scaling factor
+        - eps: Small value for numerical stability
+        
+        Returns:
+        - loss: NT-Xent loss value
+        """
+        # Gather representations in case of distributed training (assuming no distributed training here)
+        out_1_dist = out_1
+        out_2_dist = out_2
+        out_3_dist = out_3
+        
+        # Concatenate all samples into a single tensor
+        out_all = torch.cat([out_1, out_2, out_3], dim=0)
+        out_all_dist = torch.cat([out_1_dist, out_2_dist, out_3_dist], dim=0)
+        
+        # Calculate covariance and similarity
+        cov = torch.mm(out_all, out_all_dist.t().contiguous())
+        sim = torch.exp(cov / temperature)
+        
+        # Negative similarity (excluding self-similarity)
+        neg = sim.sum(dim=-1)
+        row_sub = torch.Tensor(neg.shape).fill_(math.e).to(neg.device)
+        neg = torch.clamp(neg - row_sub, min=eps)  # clamp for numerical stability
+        
+        # Positive similarities (within the triplet)
+        pos_ab = torch.exp(torch.sum(out_1 * out_2, dim=-1) / temperature)
+        pos_ac = torch.exp(torch.sum(out_1 * out_3, dim=-1) / temperature)
+        pos_bc = torch.exp(torch.sum(out_2 * out_3, dim=-1) / temperature)
+        
+        # Combine positive similarities
+        pos = torch.cat([pos_ab, pos_ac, pos_bc], dim=0)
+        
+        # Calculate NT-Xent loss
+        loss = -torch.log(pos / (neg + eps)).mean()
+        
+        return loss
+
+
 
     @staticmethod
     def add_model_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
         
-        # temporal params
-        #parser.add_argument("--temporal_mode", default="2images", type=str, help="images to push in a temporal window")
         # model arch params
         parser.add_argument("--arch", default="resnet18", type=str, help="convnet architecture") 
         # specify flags to store false
@@ -416,8 +476,8 @@ class SimCLR(pl.LightningModule):
         parser.add_argument("--feat_dim", default=128, type=int, help="feature dimension")
 
         # transform params
-        #parser.add_argument("--gaussian_blur", action="store_true", help="add gaussian blur")
-        #parser.add_argument("--jitter_strength", type=float, default=0.5, help="jitter strength")
+        parser.add_argument("--gaussian_blur", action="store_true", help="add gaussian blur")
+        parser.add_argument("--jitter_strength", type=float, default=0.5, help="jitter strength")
         parser.add_argument("--data_dir", type=str, default=".", help="directory containing dataset")
 
         # training params
