@@ -101,17 +101,158 @@ Next, a requirement.txt file is present with this repo which has a list of all t
 pip3 install -r requirements_production.txt
 ```
 
-<b>Note:</b> If any of the libraries fail to install, then recheck your python version as shown in step 1.
+<b>Note:</b> If any of the libraries fail to install, then recheck your python and pip version as shown in step 1.
 
 <br>
 
+# Experiments
 
-# Experiment I
+<p>Below, we systematically present the experiments conducted in this paper. Each model was trained with three different seeds, and we provide checkpoints for all trained models. Under each experiment, you will find a table listing the model details, followed by an example bash script to replicate the experiment. Use the bash scripts located in the training_jobs directory to train each model.</p>
 
-Note to self: each experiment will have its own table of checkpoints, expriment type and a sh file to replicate the experiment.
+## Experiment I
 
-# Experiment II
+|Model | Backbone | Layers | Training Samples | Checkpoint |
+|----------|----------|----------|----------|----------|
+| Autoencoder | ResNet-18 | 18 | 10k | Coming soon |
+| VAE | ResNet-18 | 18 | 10k | Coming soon |
+| Barlow Twins | ResNet-18 | 18 | 10k | Coming soon |
+| BYOL | ResNet-18 | 18 | 10k | Coming soon |
+| SimCLR | ResNet-18 | 18 | 10k | Coming soon |
+| GreedyInfoMax | ResNet-10 | 10 | 10k | Coming soon |
+| GreedyInfoMax | ResNet-34 | 34 | 10k | Coming soon |
+| GreedyInfoMax | ResNet-50 | 50 | 10k | Coming soon |
 
-# Experiment III
 
-# Experiment IV
+```bash
+# Here is the example bash script
+# Change dataset size to 10k, change backbone to resnet18
+viewpoint=V11O2
+
+for viewpoint in V1O1 V1O2 V10O1 V10O2
+do
+    python3 ../train_byol.py \
+        --max_epochs 100 \
+        --batch_size 512 \
+        --data_dir /data/lpandey/Wood_13Dataset/training/${viewpoint} \
+        --seed_val 0 \
+        --dataset_size 10000 \
+        --backbone resnet18 \
+        --val_split 0.01 \
+        --shuffle \
+        --aug True \
+        --print_model \
+        --exp_name my_exp/${viewpoint}
+done
+```
+
+## Experiment II
+
+|Model | Backbone | Layers | Training Samples | Checkpoint |
+|----------|----------|----------|----------|----------|
+| Autoencoder | ResNet | 10, 14, 18, 34 | 5k - 80k | Coming soon |
+| VAE | ResNet | 10, 14, 18, 34 | 5k - 80k | Coming soon |
+| Barlow Twins | ResNet | 10, 14, 18, 34 | 5k - 80k | Coming soon |
+| BYOL | ResNet | 10, 14, 18, 34 | 5k - 80k | Coming soon |
+| SimCLR | ResNet | 10, 14, 18, 34 | 5k - 80k | Coming soon |
+
+```bash
+# Here is the example bash script
+# Change dataset size between 5k-80k
+# Change backbone from [resnet34, resnet18, resnet18_3blocks, resnet18_2blocks]
+viewpoint=V11O2
+
+for viewpoint in V1O1 V1O2 V10O1 V10O2
+do
+    python3 ../train_byol.py \
+        --max_epochs 100 \
+        --batch_size 512 \
+        --data_dir /data/lpandey/Wood_13Dataset/training/${viewpoint} \
+        --seed_val 0 \
+        --dataset_size 5000 \
+        --backbone resnet18_2blocks \
+        --val_split 0.01 \
+        --shuffle \
+        --aug True \
+        --print_model \
+        --exp_name my_exp/${viewpoint}
+done
+```
+
+
+
+## Experiment III
+
+|Model | Backbone | Layers | Training Samples | Checkpoint |
+|----------|----------|----------|----------|----------|
+| SimCLR-CLTT | ResNet-10 | 10 | 80k | Coming soon |
+| SimCLR-CLTT | ResNet-4 | 4 | 80k | Coming soon |
+
+```bash
+# Here is the example bash script
+# Change dataset size between 5k-80k
+# Change backbone from [resnet34, resnet18, resnet18_3blocks, resnet18_2blocks]
+viewpoint=V11O2
+
+for viewpoint in V1O1 V1O2 V10O1 V10O2
+do
+    python3 ../train_simclr.py \
+        --lars_wrapper \
+        --max_epochs 100 \
+        --batch_size 512 \
+        --data_dir /data/lpandey/Wood_13Dataset/training/${viewpoint} \
+        --seed_val 0 \
+        --dataset_size 5000 \
+        --backbone resnet18_2blocks \
+        --temporal \
+        --window_size 3 \
+        --val_split 0.05 \
+        --aug False \
+        --loss_ver v0 \
+        --exp_name my_exp/${viewpoint}
+done
+```
+
+
+
+## Experiment IV
+
+|Model | Backbone | Layers | Training Samples | Checkpoint |
+|----------|----------|----------|----------|----------|
+| ViT-CoT | Transformer | 1 | 80k | Coming soon |
+| ViT-CoT | Transformer | 3 | 80k | Coming soon |
+| ViT-CoT | Transformer | 6 | 80k | Coming soon |
+| ViT-CoT | Transformer | 9 | 80k | Coming soon |
+
+
+```bash
+# Here is the example bash script
+# Change dataset size between 5k-80k
+# Change backbone from [resnet34, resnet18, resnet18_3blocks, resnet18_2blocks]
+viewpoint=V11O2
+
+for viewpoint in V1O1 V1O2 V10O1 V10O2
+do
+    python3 ../train_vit_simclr.py \
+        --lars_wrapper \
+        --max_epochs 100 \
+        --batch_size 512 \
+        --data_dir /data/lpandey/Wood_13Dataset/training/${viewpoint} \
+        --seed_val 0 \
+        --dataset_size 5000 \
+        --head 1 \
+        --backbone resnet18_2blocks \
+        --temporal \
+        --window_size 3 \
+        --val_split 0.05 \
+        --aug False \
+        --loss_ver v0 \
+        --exp_name my_exp/${viewpoint}
+done
+```
+
+
+## Experiment V
+
+Here, Experiments I - IV were repeated with a different training dataset <a src="https://vision.cs.utexas.edu/projects/egocentric_data/UT_Egocentric_Dataset.html">(Human Egocentric Dataset)</a>, instead of chick datasets.
+
+Here, Experiments I–IV were repeated using a different training dataset, the <a src="https://vision.cs.utexas.edu/projects/egocentric_data/UT_Egocentric_Dataset.html">Human Egocentric Dataset</a>, instead of the chick datasets.
