@@ -1,17 +1,11 @@
-# purpose - controlled classification TASK#8 : drop samples from viewpoints
-
 import os
 from typing import Any, Callable, List, Optional, Tuple, Union
 
 import pandas as pd
-import torch
 import torchvision.transforms as T
 from PIL import Image
-from pl_bolts.datamodules.vision_datamodule import VisionDataModule
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import Dataset, DataLoader
-from torchvision.datasets import ImageFolder
-from pytorch_lightning.callbacks import Callback
 
 
 class InvariantRecognition(Dataset):
@@ -21,7 +15,7 @@ class InvariantRecognition(Dataset):
         drop_train_samples: int,
         viewpoints: List[int] = None,
         transform: Optional[Callable] = T.ToTensor(),
-        training: bool = False, # extra parameter added
+        training: bool = False,
         
     ):
         if viewpoints is None:
@@ -94,8 +88,7 @@ class InvariantRecognition(Dataset):
 class InvariantRecognitionDataModule(LightningDataModule):
     name = "invariant_recognition"
     dataset_cls = InvariantRecognition
-    dims = (3, 64, 64) # this is not creating any significant difference. I have tried changing it and the dataset but it does not matter.
-    print("image dims selected in invariant_recognition.py - ", dims)
+    dims = (3, 64, 64)
     viewpoints = list(range(1, 13)) # 1..12
 
     def __init__(
@@ -136,7 +129,7 @@ class InvariantRecognitionDataModule(LightningDataModule):
         self.shuffle = shuffle 
         self.pin_memory = pin_memory
         self.drop_last = drop_last
-        self.drop_train_samples = 0 # by default, dont drop any train samples
+        self.drop_train_samples = 0
 
         if self.num_folds > len(self.viewpoints) or self.num_folds < 2:
             raise ValueError(
@@ -154,24 +147,9 @@ class InvariantRecognitionDataModule(LightningDataModule):
     def viewpoint_splits(self) -> Tuple[List[int], List[int]]:
         """ Split viewpoints into train and validation folds. """
         n_viewpoints = int(len(self.viewpoints) / self.num_folds)
-        # for 6 fold (k=6), val_viewpoints = [1,2]
-        # and train_viewpoints = [3,4,.....,12] , leave the ones in val_viewpoints
 
         val_viewpoints = [self.val_fold * n_viewpoints + i + 1 for i in range(n_viewpoints)]
         train_viewpoints = [v for v in self.viewpoints if v not in val_viewpoints]
-
-       
-        print("train_viewpoints: ", train_viewpoints)
-        print("val_viewpoints: ", val_viewpoints)
-        
-        #print("graph - 6_fold\n")
-        #return train_viewpoints, val_viewpoints #-> 6 fold, for first graph of paper [pass 6 in flags]
-        #print("graph - 6_spase(flag=6), 12_sparse(flag=12)\n")
-        #return val_viewpoints, train_viewpoints #- > for inverse of 6 fold, second graph of paper [pass 6 in flags]
-        
-        #print("graph - 1_fold\n")
-        #return val_viewpoints, train_viewpoints #- > for inverse of 6 fold, third graph of paper [pass 12 in flags]
-
 
         if self.identifier == "6fold":
             print("Fold selected = 6Fold\n") #flag = 6
@@ -207,15 +185,6 @@ class InvariantRecognitionDataModule(LightningDataModule):
             # implement code to throw error
             print("Wrong fold type or num_folds selected\n")
         
-
-
-    """
-    This is where we will load in data from the file and prepare PyTorch tensor datasets for each split.
-    the data split is thus reproducible. This method expects a stage arg which is used to separate logic for 'fit' and 'test'.
-    This is helpful if we don't want to load the entire dataset at once.
-    The data operations that we want to perform on every GPU is defined here.
-    This includes applying transform to the PyTorch tensor dataset.
-    """
     
     def setup(self, stage: Optional[str] = None) -> None: # lighteningDataModule prebuilt function
         """ Create train, val, and test dataset. """

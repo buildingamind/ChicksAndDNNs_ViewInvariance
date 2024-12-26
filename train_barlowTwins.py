@@ -81,7 +81,7 @@ class BarlowTwins(pl.LightningModule):
         self,
         num_training_samples=0,
         batch_size=512,
-        backbone='resnet18',
+        backbone='resnet_2blocks',
         encoder_out_dim=512,
         lambda_coeff=5e-3,
         z_dim=128,

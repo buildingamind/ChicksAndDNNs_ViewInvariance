@@ -13,10 +13,6 @@ from torch.optim.optimizer import Optimizer
 
 from models.archs import resnets
 
-# TODO: import all the architectures
-from models.archs import resnet_3b
-from models.archs import resnet_2b
-from models.archs import resnet_1b
 from models.archs.resnet_3b import resnet_3blocks
 from models.archs.resnet_2b import resnet_2blocks
 from models.archs.resnet_1b import resnet_1block
