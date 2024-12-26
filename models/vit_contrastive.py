@@ -1,58 +1,33 @@
 # LIBRARIES
 from argparse import ArgumentParser
-from typing import Callable, Optional
-import wandb
-from pytorch_lightning.loggers import WandbLogger
-import os
-from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.metrics import Accuracy
-# Pytorch modules
 import torch
 import torch.nn
-import torchvision.models as models
 from torch.nn import functional as F
 from torch import nn
-from torch.optim import Adam
-from torch.utils.data import DataLoader, random_split
-
-# Pytorch-Lightning
-from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 import pytorch_lightning as pl
-import torchmetrics
 from torchmetrics import Accuracy
 from vit_pytorch import ViT
 from transformers import ViTConfig
-
-from torch.utils.data import DataLoader, random_split
-
-# Pytorch-Lightning
-from pytorch_lightning import LightningDataModule
-
-from torchvision import transforms
-from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
-from datamodules import ImageFolderDataModule
 import math
 
-# Extras
-from argparse import Namespace
 
 
-
-# enter the configuration details for the model
+# enter the model configuration details 
 class ViTConfigExtended(ViTConfig):
-    def __init__(self, hidden_size=768, # original 768
-        num_hidden_layers=1, # original 12
-        num_attention_heads=1, # original 12
-        intermediate_size=3072, # original 3072
+    def __init__(self, hidden_size=768,
+        num_hidden_layers=1, 
+        num_attention_heads=1, 
+        intermediate_size=3072, 
         hidden_act="gelu",
         hidden_dropout_prob=0.0,
         attention_probs_dropout_prob=0.0,
         initializer_range=0.02,
         layer_norm_eps=1e-12,
-        image_size=64, # original 224
-        patch_size=8, # original 16
+        image_size=64,
+        patch_size=8, 
         num_channels=3,
-        num_classes: int = 512): # original 1000
+        num_classes: int = 512):
         super().__init__()
         self.num_classes = num_classes
         self.hidden_size = hidden_size
@@ -62,14 +37,15 @@ class ViTConfigExtended(ViTConfig):
         self.patch_size = patch_size
         self.image_size = image_size
         self.num_channels = num_channels
-        #print("Number of Hidden Layers: ", self.num_hidden_layers)
-        #print("Number of Attention Heads: ", self.num_attention_heads)
-        #print("Number of classes", self.num_classes)
+        self.hidden_act = hidden_act
+        self.hidden_dropout_prob = hidden_dropout_prob
+        self.attention_probs_dropout_prob = attention_probs_dropout_prob
+        self.initializer_range = initializer_range
+        self.layer_norm_eps = layer_norm_eps
 
 
-# object for configuring ViT hyper parameters
+# configuration object for ViT hyper-paras
 configuration = ViTConfigExtended()
-
 
 
 
@@ -104,7 +80,7 @@ class VisionTransformer(nn.Module):
         return self.model(x)
 
 class Backbone(torch.nn.Module):
-    def __init__(self, model_type, config): # configuration object is the same as config.
+    def __init__(self, model_type, config):
         super().__init__()
         if model_type == 'vit':
             self.model = VisionTransformer(config)
@@ -146,7 +122,8 @@ class LitClassifier(pl.LightningModule):
     def __init__(
         self,
         backbone,
-        temporal_mode: str = None,
+        loss_ver = 'v0',
+        window_size = 3,
         learning_rate = 1e-3,
         hidden_mlp = 512,
         feat_dim = 128,
@@ -154,18 +131,20 @@ class LitClassifier(pl.LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
+        self.loss_ver = loss_ver
+        self.window_size = window_size
         self.hidden_mlp = hidden_mlp
         self.feat_dim = feat_dim
         self.hidden_depth = hidden_depth
+        self.learning_rate = learning_rate
         
         self.backbone = backbone   # ViT encoder
-        self.temporal_mode = temporal_mode # type of temporal window
         
-        self.projection = Projection(    # SimCLR projection head
+        self.projection = Projection(    # projection head, similar to SimCLR
             input_dim=self.hidden_mlp, # 512
             hidden_dim=self.hidden_mlp, # 512
             output_dim=self.feat_dim, # 128
-            depth=self.hidden_depth, #1
+            depth=self.hidden_depth, # 1
         )
         
         self.val_acc = Accuracy(compute_on_step=False)
@@ -178,106 +157,82 @@ class LitClassifier(pl.LightningModule):
     
     
     def shared_step(self, batch):
-        # push two images together in a temporal window - 
 
-        if self.temporal_mode == '2images':
-            # len(batch) = 3 for temporal model, not confirmed for non-temporal
-            if len(batch) == 3:
-                img1, img2, _ = batch # (img1, img2, index)
+        # loss version v0
+        if self.loss_ver == 'v0':
+            # PUSH TWO IMAGES TOGETHER IN THE EMBEDDING SPACE
+            if self.window_size < 3:
+                if len(batch) == 3:
+                    img1, img2, _ = batch   # returns img1, img2, index
 
-            else:
-                # final image in tuple is for online eval
-                (img1, img2, _), _ = batch
-            # get h representations, bolts resnet returns a list
-            h1 = self.backbone(img1)
-            h2 = self.backbone(img2)
+                else:
+                    # final image in tuple is for online eval
+                    (img1, img2, _), _ = batch
 
-            # get z representations
-            z1 = self.projection(h1)
-            z2 = self.projection(h2)
+                # get h representations, bolts resnet returns a list
+                h1 = self.backbone(img1)
+                h2 = self.backbone(img2)
 
-            loss = self.nt_xent_loss(z1, z2, self.temperature)
-        
-        # push 2+ images in a temporal window - 
-        else:
-            #print(type(batch)) #<class 'list'>
-            #print(len(batch)) #len = 4 for window_size = 3 because 3 images, and 1 index value
-            # window_size = 3
-            if len(batch) == 4:
-                flag = 0
-                img1, img2, img3, _ = batch # (img1, img2, img3, index)
+                # get z representations
+                z1 = self.projection(h1)
+                z2 = self.projection(h2)
 
-            # window_size = 4
-            else:
-                flag = 1
-                img1, img2, img3, img4, _ = batch # (img1, img2, img3, img4, index)
+                loss = self.nt_xent_loss(z1, z2, self.temperature)
             
-            # get h representations, bolts resnet returns a list
-            h1 = self.backbone(img1)
-            h2 = self.backbone(img2)
-            h3 = self.backbone(img3)
-                
-            if flag == 1:
-                h4 = self.backbone(img4)
-                z4 = self.projection(h4)
+            # PUSH MORE THAN TWO IMAGES TOGETHER IN THE EMBEDDING SPACE 
+            else:
+                #print(type(batch)) --> <class 'list'>
+                #print(len(batch)) #len = 4 for window_size = 3 --> [img1, img2, img3, index]
+
+                # if window_size 3
+                if len(batch) == 4:
+                    flag = 0
+                    img1, img2, img3, _ = batch # [img1, img2, img3, index]
+
+                # if window_size = 4
+                else:
+                    flag = 1
+                    img1, img2, img3, img4, _ = batch # [img1, img2, img3, img4, index]
                     
+                # get h representations, bolts resnet returns a list
+                h1, h2, h3 = self.backbone(img1), self.backbone(img2), self.backbone(img3)
+
+                    
+                if flag == 1:
+                    h4 = self.backbone(img4)
+                    z4 = self.projection(h4)
+                        
+
+                # get z representations
+                z1, z2, z3 = self.projection(h1), self.projection(h2), self.projection(h3)
+
+                # push z1 and z2 together
+                l1 = self.nt_xent_loss(z1,z2, self.temperature)
+                # push z1 and z3 together
+                l2 = self.nt_xent_loss(z1,z3, self.temperature)
+                if flag == 1:
+                    l3 = self.nt_xent_loss(z1,z4, self.temperature)
+                        
+                    # gather losses - 
+                    loss = (l1+l2+l3)
+                else:
+                    # gather losses - 
+                    loss = (l1+l2)
+        
+         # loss version v1
+        else:
+            # window_size 3
+            img1, img2, img3, _ = batch
+
+            # get h representations, bolts resnet returns a list
+            h1, h2, h3 = self.backbone(img1), self.backbone(img2), self.backbone(img3)
 
             # get z representations
-            z1 = self.projection(h1)
-            z2 = self.projection(h2)
-            z3 = self.projection(h3)
+            z1, z2, z3 = self.projection(h1), self.projection(h2), self.projection(h3)
 
-            # loss between z1 and other neighboring samples
-            l1 = self.nt_xent_loss(z1,z2, self.temperature)
-            l2 = self.nt_xent_loss(z1,z3, self.temperature)
-            if flag == 1:
-                l3 = self.nt_xent_loss(z1,z4, self.temperature)
-                    
-                # gather losses - 
-                loss = (l1+l2+l3)
-            else:
-                # gather losses - 
-                loss = (l1+l2)
+            loss = self.nt_xent_loss_triplet(z1, z2, z3, self.temperature)
 
         return loss
-    
-    def nt_xent_loss(self, out_1, out_2, temperature, eps=1e-6):
-        """
-            assume out_1 and out_2 are normalized
-            out_1: [batch_size, dim]
-            out_2: [batch_size, dim]
-        """
-        # gather representations in case of distributed training
-        # out_1_dist: [batch_size * world_size, dim]
-        # out_2_dist: [batch_size * world_size, dim]
-        
-        out_1_dist = out_1
-        out_2_dist = out_2
-
-        # out: [2 * batch_size, dim]
-        # out_dist: [2 * batch_size * world_size, dim]
-        out = torch.cat([out_1, out_2], dim=0)
-        out_dist = torch.cat([out_1_dist, out_2_dist], dim=0)
-
-        # cov and sim: [2 * batch_size, 2 * batch_size * world_size]
-        # neg: [2 * batch_size]
-        cov = torch.mm(out, out_dist.t().contiguous())
-        sim = torch.exp(cov / temperature)
-        neg = sim.sum(dim=-1)
-
-        # from each row, subtract e^1 to remove similarity measure for x1.x1
-        row_sub = torch.Tensor(neg.shape).fill_(math.e).to(neg.device)
-        neg = torch.clamp(neg - row_sub, min=eps)  # clamp for numerical stability
-
-        # Positive similarity, pos becomes [2 * batch_size]
-        pos = torch.exp(torch.sum(out_1 * out_2, dim=-1) / temperature)
-        pos = torch.cat([pos, pos], dim=0)
-
-        loss = -torch.log(pos / (neg + eps)).mean()
-
-        return loss
-
-
 
     def training_step(self, batch, batch_idx):
         #loss = self.step(batch, batch_idx)
@@ -296,6 +251,100 @@ class LitClassifier(pl.LightningModule):
     def configure_optimizers(self):
         # self.hparams available because we called self.save_hyperparameters()
         return torch.optim.Adam(self.parameters(), lr=1e-4)
+    
+    # LOSS FUNCTION - 
+    # Loss version 0 implementation
+    def nt_xent_loss(self, out_1, out_2, temperature, eps=1e-6):
+        """
+            assume out_1 and out_2 are normalized
+            out_1: [batch_size, dim]
+            out_2: [batch_size, dim]
+        """
+
+        '''
+        out_1.shape - [512, 128]
+        dim is 128 because the output from projection head is of 128 dims.
+        '''
+        
+        # gather representations in case of distributed training
+        # out_1_dist: [batch_size * world_size, dim]
+        # out_2_dist: [batch_size * world_size, dim]
+ 
+        out_1_dist = out_1
+        out_2_dist = out_2
+
+        # out: [2 * batch_size, dim] -> [1024, 128]
+        # out_dist: [2 * batch_size * world_size, dim] -> [1024, 128]
+        out = torch.cat([out_1, out_2], dim=0)
+        
+        out_dist = torch.cat([out_1_dist, out_2_dist], dim=0)
+
+        # cov and sim: [2 * batch_size, 2 * batch_size * world_size]
+        # neg: [2 * batch_size]
+        cov = torch.mm(out, out_dist.t().contiguous())  
+        sim = torch.exp(cov / temperature) # denominator part of the loss function, since out_1 and out_2 is a batch that is passed, and not a single image.
+        neg = sim.sum(dim=-1) # refer RM notes for understanding dimensionality
+
+
+        # from each row, subtract e^1 to remove similarity measure for x1.x1
+        row_sub = torch.Tensor(neg.shape).fill_(math.e).to(neg.device)
+        neg = torch.clamp(neg - row_sub, min=eps)  # clamp for numerical stability
+
+        # Positive similarity, pos becomes [2 * batch_size] -> numerator part of the loss function
+        pos = torch.exp(torch.sum(out_1 * out_2, dim=-1) / temperature) # only mat_mul requires the column and rows to be similar. This is element by element multiplication
+        pos = torch.cat([pos, pos], dim=0) 
+
+        loss = -torch.log(pos / (neg + eps)).mean() # num/den
+
+        return loss
+    
+    # Loss version 1 implementation
+    def nt_xent_loss_triplet(self, out_1, out_2, out_3, temperature, eps=1e-6):
+        """
+        Normalized Temperature-scaled Cross Entropy (NT-Xent) loss for triplets of samples.
+        
+        Args:
+        - out_1: Tensor of shape [batch_size, dim], first sample representations
+        - out_2: Tensor of shape [batch_size, dim], second sample representations
+        - out_3: Tensor of shape [batch_size, dim], third sample representations
+        - temperature: Floating point value, temperature scaling factor
+        - eps: Small value for numerical stability
+        
+        Returns:
+        - loss: NT-Xent loss value
+        """
+        # Gather representations in case of distributed training (assuming no distributed training here)
+        out_1_dist = out_1
+        out_2_dist = out_2
+        out_3_dist = out_3
+        
+        # Concatenate all samples into a single tensor
+        out_all = torch.cat([out_1, out_2, out_3], dim=0)
+        out_all_dist = torch.cat([out_1_dist, out_2_dist, out_3_dist], dim=0)
+        
+        # Calculate covariance and similarity
+        cov = torch.mm(out_all, out_all_dist.t().contiguous())
+        sim = torch.exp(cov / temperature)
+        
+        # Negative similarity (excluding self-similarity)
+        neg = sim.sum(dim=-1)
+        row_sub = torch.Tensor(neg.shape).fill_(math.e).to(neg.device)
+        neg = torch.clamp(neg - row_sub, min=eps)  # clamp for numerical stability
+        
+        # Positive similarities (within the triplet)
+        pos_ab = torch.exp(torch.sum(out_1 * out_2, dim=-1) / temperature)
+        pos_ac = torch.exp(torch.sum(out_1 * out_3, dim=-1) / temperature)
+        pos_bc = torch.exp(torch.sum(out_2 * out_3, dim=-1) / temperature)
+        
+        # Combine positive similarities
+        pos = torch.cat([pos_ab, pos_ac, pos_bc], dim=0)
+        
+        # Calculate NT-Xent loss
+        loss = -torch.log(pos / (neg + eps)).mean()
+        
+        return loss
+
+
 
     @staticmethod
     def add_model_specific_args(parent_parser):
