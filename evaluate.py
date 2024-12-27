@@ -89,7 +89,7 @@ def cross_validation(args, fold_idx, count):
     model_checkpoint = ModelCheckpoint(save_last=True, save_top_k=1, monitor='val_loss', filename='{epoch}-'+str(count))
     callbacks = [model_checkpoint]
 
-    logger = WandbLogger(save_dir=f"LOGS/eval/{args.model}", name=args.exp_name, project=f"{args.project_name}", log_model="all")
+    logger = WandbLogger(save_dir=f"/home/lpandey/LOGS/eval/{args.model}", name=args.exp_name, project=f"{args.project_name}", log_model="all")
 
     trainer = pl.Trainer(
         gpus=1,
