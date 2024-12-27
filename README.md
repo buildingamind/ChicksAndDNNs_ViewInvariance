@@ -292,8 +292,8 @@ Note: Upon running the above command, you will be prompted in the terminal to en
   <tr>
     <td align="center">
       <a href="https://www.buildingamind.com/"><b>Lalit Pandey</b></a><br>
-     <span style="font-size: small;">PhD Student</span><br>
-      <span style="font-size: small;">Indiana University Bloomington</span>
+     <p style="font-size: small;">PhD Student</p><br>
+      <p style="font-size: small;">Indiana University Bloomington</p>
     </td>
     <td align="center">
       <a href="https://www.buildingamind.com/"><b>Samantha M. W. Wood</b></a><br>
