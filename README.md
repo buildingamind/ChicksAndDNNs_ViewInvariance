@@ -121,20 +121,20 @@ In this section, we show how the different visual encoders are trained using sel
 
 ## Experiment I
 
-|Model | Backbone | Layers | Training Samples | Checkpoint |
-|----------|----------|----------|----------|----------|
-| Autoencoder | ResNet-18 | 18 | 10k | Coming soon |
-| VAE | ResNet-18 | 18 | 10k | Coming soon |
-| Barlow Twins | ResNet-18 | 18 | 10k | Coming soon |
-| BYOL | ResNet-18 | 18 | 10k | Coming soon |
-| SimCLR | ResNet-18 | 18 | 10k | Coming soon |
-| GreedyInfoMax | ResNet-10 | 10 | 10k | Coming soon |
-| GreedyInfoMax | ResNet-34 | 34 | 10k | Coming soon |
-| GreedyInfoMax | ResNet-50 | 50 | 10k | Coming soon |
+|Model | Backbone | Layers | Training Samples |
+|----------|----------|----------|----------|
+| Autoencoder | ResNet-18 | 18 | 10k |
+| VAE | ResNet-18 | 18 | 10k |
+| Barlow Twins | ResNet-18 | 18 | 10k |
+| BYOL | ResNet-18 | 18 | 10k |
+| SimCLR | ResNet-18 | 18 | 10k |
+| GreedyInfoMax | ResNet-10 | 10 | 10k |
+| GreedyInfoMax | ResNet-34 | 34 | 10k |
+| GreedyInfoMax | ResNet-50 | 50 | 10k |
 
 
 ```bash
-# Here is the example bash script
+# Here is an example bash script
 # Change dataset size to 10k, change backbone to resnet18
 viewpoint=V11O2
 
@@ -157,16 +157,16 @@ done
 
 ## Experiment II
 
-|Model | Backbone | Layers | Training Samples | Checkpoint |
-|----------|----------|----------|----------|----------|
-| Autoencoder | ResNet | 10, 14, 18, 34 | 5k - 80k | Coming soon |
-| VAE | ResNet | 10, 14, 18, 34 | 5k - 80k | Coming soon |
-| Barlow Twins | ResNet | 10, 14, 18, 34 | 5k - 80k | Coming soon |
-| BYOL | ResNet | 10, 14, 18, 34 | 5k - 80k | Coming soon |
-| SimCLR | ResNet | 10, 14, 18, 34 | 5k - 80k | Coming soon |
+|Model | Backbone | Layers | Training Samples |
+|----------|----------|----------|----------|
+| Autoencoder | ResNet | 10, 14, 18, 34 | 5k - 80k |
+| VAE | ResNet | 10, 14, 18, 34 | 5k - 80k |
+| Barlow Twins | ResNet | 10, 14, 18, 34 | 5k - 80k |
+| BYOL | ResNet | 10, 14, 18, 34 | 5k - 80k |
+| SimCLR | ResNet | 10, 14, 18, 34 | 5k - 80k |
 
 ```bash
-# Here is the example bash script
+# Here is an example bash script
 # Change dataset size between 5k-80k
 # Change backbone from [resnet34, resnet18, resnet18_3blocks, resnet18_2blocks]
 viewpoint=V11O2
@@ -192,13 +192,13 @@ done
 
 ## Experiment III
 
-|Model | Backbone | Layers | Training Samples | Checkpoint |
-|----------|----------|----------|----------|----------|
-| SimCLR-CLTT | ResNet-10 | 10 | 80k | Coming soon |
-| SimCLR-CLTT | ResNet-4 | 4 | 80k | Coming soon |
+|Model | Backbone | Layers | Training Samples |
+|----------|----------|----------|----------|
+| SimCLR-CLTT | ResNet-10 | 10 | 80k |
+| SimCLR-CLTT | ResNet-4 | 4 | 80k |
 
 ```bash
-# Here is the example bash script
+# Here is an example bash script
 # Change dataset size between 5k-80k
 # Change backbone from [resnet34, resnet18, resnet18_3blocks, resnet18_2blocks]
 viewpoint=V11O2
@@ -226,16 +226,16 @@ done
 
 ## Experiment IV
 
-|Model | Backbone | Layers | Training Samples | Checkpoint |
-|----------|----------|----------|----------|----------|
-| ViT-CoT | Transformer | 1 | 80k | Coming soon |
-| ViT-CoT | Transformer | 3 | 80k | Coming soon |
-| ViT-CoT | Transformer | 6 | 80k | Coming soon |
-| ViT-CoT | Transformer | 9 | 80k | Coming soon |
+|Model | Backbone | Layers | Training Samples |
+|----------|----------|----------|----------|
+| ViT-CoT | Transformer | 1 | 80k |
+| ViT-CoT | Transformer | 3 | 80k |
+| ViT-CoT | Transformer | 6 | 80k |
+| ViT-CoT | Transformer | 9 | 80k |
 
 
 ```bash
-# Here is the example bash script
+# Here is an example bash script
 # Change dataset size between 5k-80k
 # Change backbone from [resnet34, resnet18, resnet18_3blocks, resnet18_2blocks]
 viewpoint=V11O2
@@ -268,6 +268,18 @@ Here, Experiments I–IV were repeated using a different training dataset, the <
 
 # Experiments (Model Testing Phase)
 
-In this section, we show how different visual encoders are frozen after training and tested using a linear probe.
+In this section, we show how visual encoders are frozen after training and tested using a linear probe.
 
-Note to self: show two examples having distinct settings.
+To see all the different flags to run the evaluation script, enter - 
+
+```python
+python3 evaluate.py --help
+```
+
+Here is an example command line argument to test a trained model using a linear probe - 
+
+```python
+python3 evaluate.py --model "simclr" --model_path "path_to_checkpoint" --data_dir "path_to_test_dataset" --num_folds 12 --identifier "12fold" --max_epochs 100 --exp_name "exp1" --project_name "my_project"
+```
+
+Note: Upon running the above command, you will be prompted in the terminal to enter your credentials for the WandB dashboard. If you don't already have an account, please create one on the WandB platform. All test data will be logged to the WandB dashboard. Alternatively, you can log the test scores into a CSV file by enabling the corresponding flag. Make sure to set this flag to True if you prefer using a CSV file.

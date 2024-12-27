@@ -37,8 +37,7 @@ def cli_main():
     args = parser.parse_args()
     count = -1
     
-    # TODO: fix this hardcoded path
-    LOG_DIR = f"/data/lpandey/LOGS/eval/csv/{args.project_name}.csv"
+    LOG_DIR = f"{args.csv_path}{args.project_name}.csv"
 
     write_csv_stats(LOG_DIR,
                     [{'MODEL':args.model, ' EXPERIMENT':args.exp_name, ' FOLD':args.identifier, ' TEST_SET':args.data_dir}])
@@ -50,15 +49,13 @@ def cli_main():
         cross_validation(args, fold, count)
     
     if args.save_csv:
-        # TODO: fix this hardcoded path
         # push result data to a .csv file
-        dataFrame.to_csv(f"/home/lpandey/LOGS/eval/dataframes/{args.project_name}", sep=',')
+        dataFrame.to_csv(f"{args.csv_path}/{args.exp_name}.csv", sep=',')
 
 
 def cross_validation(args, fold_idx, count):
 
-    # TODO: fix this hardcoded path
-    LOG_DIR = f"/data/lpandey/LOGS/eval/csv/{args.project_name}.csv"
+    LOG_DIR = f"{args.csv_path}{args.project_name}.csv"
     
     
     dm = InvariantRecognitionDataModule(
@@ -130,8 +127,7 @@ def init_model(args):
         model = BYOL.load_from_checkpoint(args.model_path)
         model = model.online_network.encoder
     elif args.model == 'barlowTwins':
-        model = BarlowTwins(backbone=args.arch).load_from_checkpoint(args.model_path)
-        #model = BarlowTwins.load_from_checkpoint(args.model_path)
+        model = BarlowTwins.load_from_checkpoint(args.model_path)
     elif args.model == 'ae':
         model = AE.load_from_checkpoint(args.model_path).encoder
     elif args.model == 'vae':
@@ -214,8 +210,6 @@ def create_argparser():
                                                       'vit',
                                                       ]
                                                       )
-    parser.add_argument("--arch", type=str, choices=["resnet34", "resnet18", "resnet_3blocks", "resnet_2blocks", "resnet_1block"],
-                        help="select the right architecture for the frozen checkpoint")
     parser.add_argument("--model_path", type=str, help="stored model checkpoint")
     parser.add_argument("--max_epochs", default=100, type=int, help="Max number of epochs to train")
     parser.add_argument("--num_folds", default=12, type=int, choices=[12, 6], help="Number of k-folds")
@@ -225,6 +219,8 @@ def create_argparser():
     parser.add_argument('--patch_size', default=8, type=int, help='size of image patches')
     parser.add_argument('--vit_attention_heads', default=3, type=int, help='num of attention heads in each transformer layer')
     parser.add_argument('--vit_hidden_layers', default=3, type=int, help='number of transformer layers')
+    parser.add_argument("--save_csv", action="store_true", help="enable this to save test scores in a csv file")
+    parser.add_argument("--csv_path", type=str, default="./LOGS/CSV/", help="path to save the csv file")
     
     return parser
 
