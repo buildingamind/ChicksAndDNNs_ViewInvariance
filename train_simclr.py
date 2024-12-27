@@ -74,7 +74,7 @@ def create_argparser():
     parser.add_argument(
         "--backbone",
         type=str,
-        choices=['resnet34','resnet18','resnet18_3blocks','resnet18_2blocks','resnet18_1block'],
+        choices=['resnet34','resnet18','resnet_3blocks','resnet_2blocks','resnet_1block'],
         help="select architecture"
     )
     parser.add_argument(

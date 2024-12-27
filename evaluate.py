@@ -130,7 +130,8 @@ def init_model(args):
         model = BYOL.load_from_checkpoint(args.model_path)
         model = model.online_network.encoder
     elif args.model == 'barlowTwins':
-        model = BarlowTwins.load_from_checkpoint(args.model_path)
+        model = BarlowTwins(backbone=args.arch).load_from_checkpoint(args.model_path)
+        #model = BarlowTwins.load_from_checkpoint(args.model_path)
     elif args.model == 'ae':
         model = AE.load_from_checkpoint(args.model_path).encoder
     elif args.model == 'vae':
@@ -213,6 +214,8 @@ def create_argparser():
                                                       'vit',
                                                       ]
                                                       )
+    parser.add_argument("--arch", type=str, choices=["resnet34", "resnet18", "resnet_3blocks", "resnet_2blocks", "resnet_1block"],
+                        help="select the right architecture for the frozen checkpoint")
     parser.add_argument("--model_path", type=str, help="stored model checkpoint")
     parser.add_argument("--max_epochs", default=100, type=int, help="Max number of epochs to train")
     parser.add_argument("--num_folds", default=12, type=int, choices=[12, 6], help="Number of k-folds")

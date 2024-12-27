@@ -8,13 +8,13 @@ do
         --batch_size 512 \
         --data_dir /data/lpandey/UT_Austin_EgocentricDataset/output_64x64Squished/train1_80k/${viewpoint} \
         --seed_val 0 \
-        --backbone resnet18_2blocks \
+        --backbone resnet_2blocks \
         --temporal \
         --window_size 3 \
         --val_split 0.05 \
         --aug False \
         --loss_ver v0 \
-        --exp_name test_runs_nov3/${viewpoint}
+        --exp_name test_runs_dec27/${viewpoint}
 done
 
 # NOTES :

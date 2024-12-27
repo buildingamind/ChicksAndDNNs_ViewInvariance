@@ -79,7 +79,7 @@ class SimCLR(pl.LightningModule):
         num_samples: int,
         batch_size: int,
         num_nodes: int = 1,
-        arch: str = 'resnet18',
+        arch: str = 'resnet_3blocks',
         window_size: int = 3,
         loss_ver: str = 'v0',
         hidden_mlp: int = 512,
@@ -167,25 +167,25 @@ class SimCLR(pl.LightningModule):
 
 
     def init_encoder(self):
-        if self.arch.startswith('resnet'):
-            # Resnet34, Resnet18
-            if self.arch == 'resnet34' or self.arch == 'resnet18':
-                resnet = getattr(resnets, self.arch)
-                print("[INFO] Resnet Backbone Selected :: ", self.arch)
-                encoder = resnet(first_conv=True, maxpool1=True, pretrained=False, return_all_feature_maps=False)
-                return encoder
-            # Resnet18 - 3blocks
-            elif self.arch == 'resnet18_3blocks':
-                resnet = resnet_3blocks(pretrained=False)
-                print("[INFO] Resnet Backbone Selected :: ", self.arch) 
-            # Resnet18 - 2blocks
-            elif self.arch == 'resnet18_2blocks':
-                resnet = resnet_2blocks(pretrained=False)
-                print("[INFO] Resnet Backbone Selected :: ", self.arch)
-            # Resnet18 - 1block
-            elif self.arch == 'resnet18_1block':
-                resnet = resnet_1block(pretrained=False)
-                print("[INFO] Resnet Backbone Selected :: ", self.arch)
+        # if self.arch.startswith('resnet'):
+        # Resnet34, Resnet18
+        if self.arch == 'resnet34' or self.arch == 'resnet18':
+            resnet = getattr(resnets, self.arch)
+            print("[INFO] Resnet Backbone Selected :: ", self.arch)
+            encoder = resnet(first_conv=True, maxpool1=True, pretrained=False, return_all_feature_maps=False)
+            return encoder
+        # Resnet18 - 3blocks
+        elif self.arch == 'resnet_3blocks':
+            resnet = resnet_3blocks(pretrained=False)
+            print("[INFO] Resnet Backbone Selected :: ", self.arch) 
+        # Resnet18 - 2blocks
+        elif self.arch == 'resnet_2blocks':
+            resnet = resnet_2blocks(pretrained=False)
+            print("[INFO] Resnet Backbone Selected :: ", self.arch)
+        # Resnet18 - 1block
+        elif self.arch == 'resnet_1block':
+            resnet = resnet_1block(pretrained=False)
+            print("[INFO] Resnet Backbone Selected :: ", self.arch)
 
         else:
             NotImplementedError("Encoder not implemented.")

@@ -73,15 +73,15 @@ class SiameseArm(nn.Module):
                 encoder = resnet(first_conv=True, maxpool1=True, pretrained=False, return_all_feature_maps=False)
                 return encoder
             # Resnet18 - 3blocks
-            elif self.arch == 'resnet18_3blocks':
+            elif self.arch == 'resnet_3blocks':
                 resnet = resnet_3blocks(pretrained=False)
                 print("[INFO] Resnet Backbone Selected :: ", self.arch) 
             # Resnet18 - 2blocks
-            elif self.arch == 'resnet18_2blocks':
+            elif self.arch == 'resnet_2blocks':
                 resnet = resnet_2blocks(pretrained=False)
                 print("[INFO] Resnet Backbone Selected :: ", self.arch)
             # Resnet18 - 1block
-            elif self.arch == 'resnet18_1block':
+            elif self.arch == 'resnet_1block':
                 resnet = resnet_1block(pretrained=False)
                 print("[INFO] Resnet Backbone Selected :: ", self.arch)
 
@@ -283,7 +283,7 @@ def cli_main():
     parser.add_argument(
         "--backbone",
         type=str,
-        choices=['resnet34','resnet18','resnet18_3blocks','resnet18_2blocks','resnet18_1block'],
+        choices=['resnet34','resnet18','resnet_3blocks','resnet_2blocks','resnet_1block'],
         help="select backbone"
     )
     parser.add_argument(
