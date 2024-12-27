@@ -1,7 +1,0 @@
-"{'MODEL': 'simclr', ' EXPERIMENT': None, ' FOLD': '12fold', ' TEST_SET': '/data/lpandey/data_from_homeDir/data/paper1/Task8TestDataset_NoAug_11k_RGB/'}"
-"{'MODEL': 'simclr', ' EXPERIMENT': None, ' FOLD': '12fold', ' TEST_SET': '/data/lpandey/data_from_homeDir/data/paper1/Task8TestDataset_NoAug_11k_RGB/'}"
-"{'test_loss': 0.6452262997627258, 'test_acc': 0.6455000042915344}"
-"{'test_loss': 0.652479887008667, 'test_acc': 0.6184999942779541}"
-"{'test_loss': 0.605238139629364, 'test_acc': 0.7365000247955322}"
-"{'test_loss': 0.6384955048561096, 'test_acc': 0.640500009059906}"
-"{'test_loss': 0.7316436767578125, 'test_acc': 0.48350000381469727}"

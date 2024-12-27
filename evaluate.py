@@ -37,7 +37,7 @@ def cli_main():
     args = parser.parse_args()
     count = -1
     
-    LOG_DIR = f"{args.csv_path}{args.project_name}.csv"
+    LOG_DIR = f"{args.csv_path}{args.exp_name}.csv"
 
     write_csv_stats(LOG_DIR,
                     [{'MODEL':args.model, ' EXPERIMENT':args.exp_name, ' FOLD':args.identifier, ' TEST_SET':args.data_dir}])
@@ -55,7 +55,7 @@ def cli_main():
 
 def cross_validation(args, fold_idx, count):
 
-    LOG_DIR = f"{args.csv_path}{args.project_name}.csv"
+    LOG_DIR = f"{args.csv_path}{args.exp_name}.csv"
     
     
     dm = InvariantRecognitionDataModule(

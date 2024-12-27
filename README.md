@@ -279,7 +279,7 @@ python3 evaluate.py --help
 Here is an example command line argument to test a trained model using a linear probe - 
 
 ```python
-python3 evaluate.py --model "simclr" --model_path "path_to_checkpoint" --data_dir "path_to_test_dataset" --num_folds 12 --identifier "12fold" --max_epochs 100 --exp_name "exp1" --project_name "my_project"
+python3 evaluate.py --model "simclr" --model_path "path_to_checkpoint" --data_dir "path_to_test_dataset" --num_folds 12 --identifier "12fold" --max_epochs 100 --exp_name "exp1" --project_name "my_project" --save_csv
 ```
 
 Note: Upon running the above command, you will be prompted in the terminal to enter your credentials for the WandB dashboard. If you don't already have an account, please create one on the WandB platform. All test data will be logged to the WandB dashboard. Alternatively, you can log the test scores into a CSV file by enabling the corresponding flag. Make sure to set this flag to True if you prefer using a CSV file.
