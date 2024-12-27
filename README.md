@@ -292,7 +292,10 @@ Note: Upon running the above command, you will be prompted in the terminal to en
   <tr>
     <td align="center">
       <a href="https://www.buildingamind.com/"><b>Lalit Pandey</b></a><br>
-     <span style="font-size: small;">PhD Student</span><br>
+      <span style="font-size: small;">Indiana University Bloomington</span>
+    </td>
+    <td align="center">
+      <a href="https://www.buildingamind.com/"><b>Donsuk Lee</b></a><br>
       <span style="font-size: small;">Indiana University Bloomington</span>
     </td>
     <td align="center">
