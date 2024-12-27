@@ -6,7 +6,7 @@
 <p align="center">†S.M.W.W. and J.N.W. contributed equally to this work.</p>
 
 
-<h2 align="center">Accepted Journal: PLoS Computational Biology, 2024</h2>
+<h2 align="center">Journal: PLoS Computational Biology, 2024</h2>
 
 <div align="center">
 
@@ -43,6 +43,8 @@ ChicksAndDNNs_ViewInvariance
 └── train_vae.py: python script initializing VAE model, dataloader, and trainer to train the model.
 
 └── train_ae.py: python script initializing AE model, dataloader, and trainer to train the model.
+
+└── evaluate.py: python script to test trained models using a linear probe.
 
 ├── media: directory containing images and videos for the readme
 ```
@@ -283,3 +285,25 @@ python3 evaluate.py --model "simclr" --model_path "path_to_checkpoint" --data_di
 ```
 
 Note: Upon running the above command, you will be prompted in the terminal to enter your credentials for the WandB dashboard. If you don't already have an account, please create one on the WandB platform. All test data will be logged to the WandB dashboard. Alternatively, you can log the test scores into a CSV file by enabling the corresponding flag. Make sure to set this flag to True if you prefer using a CSV file.
+<br>
+
+<h2>Contributors<h2>
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://www.buildingamind.com/"><b>Lalit Pandey</b></a><br>
+     <span style="font-size: small;">PhD Student</span><br>
+      <span style="font-size: small;">Indiana University Bloomington</span>
+    </td>
+    <td align="center">
+      <a href="https://www.buildingamind.com/"><b>Samantha M. W. Wood</b></a><br>
+      <span style="font-size: small;">Lab Director</span><br>
+      <span style="font-size: small;">Indiana University Bloomington</span>
+    </td>
+    <td align="center">
+      <a href="https://www.buildingamind.com/"><b>Justin N. Wood</b></a><br>
+      <span style="font-size: small;">Lab Director</span><br>
+      <span style="font-size: small;">Indiana University Bloomington</span>
+    </td>
+  </tr>
+</table>
